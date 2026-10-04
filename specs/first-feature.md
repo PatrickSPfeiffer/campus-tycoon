@@ -22,9 +22,11 @@ starting a new run with confirmation, the full history view.
 
 ## Done when
 1. New game: buy 10 → €80 and 10 units. Then buy 41 (€82) → rejected, still €80 and 10 units.
+   Buying 0, -5 or 2.5 units is rejected; cash and stock stay unchanged.
 2. Trade with 10 units at €4 → sold 10, revenue €40, COGS €20, gross profit €20,
    cash €120, stock 0, day 2.
 3. Stop the app (Ctrl+C) and start it again → cash €120, stock 0, day 2,
    and day 1 appears exactly once in the results.
 4. Demand for prices €4, €4.01, €8, €8.01 is 10, 5, 5, 0.
-5. All tests green, on branch `first-feature`, pushed.
+5. With 3 units, trading sells 3: cash €106, stock 0. With 15 units, trading sells 10: cash €110, stock 5.
+6. All tests green, on branch `first-feature`, pushed.
