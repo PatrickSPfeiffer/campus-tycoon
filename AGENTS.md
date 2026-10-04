@@ -18,3 +18,4 @@ Product brief: docs/. Task specs: specs/.
 - Write tests only when the task asks for tests. After that, never edit, delete or skip anything in tests/; if a test seems wrong, say so and stop.
 - One spec per task. Do not build anything listed under Out of scope.
 - Keep it simple: plain functions, the standard sqlite3 module, no extra libraries. I must be able to explain every line.
+- Money is a float. Round every money calculation to 2 decimals with round(value, 2).
