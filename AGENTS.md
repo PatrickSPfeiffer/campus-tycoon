@@ -19,3 +19,4 @@ Product brief: docs/. Task specs: specs/.
 - One spec per task. Do not build anything listed under Out of scope.
 - Keep it simple: plain functions, the standard sqlite3 module, no extra libraries. I must be able to explain every line.
 - Money is a float. Round every money calculation to 2 decimals with round(value, 2).
+- The database tables may change between features. Never write code to upgrade old databases; I delete data/game.db myself.
