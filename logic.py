@@ -3,7 +3,6 @@ import db
 START_CASH = 100.0
 UNIT_COST = 2.00
 REFERENCE_PRICE = 4.00
-PRICE = 4.00
 
 
 def demand(price, reference_price):
@@ -18,7 +17,7 @@ def demand(price, reference_price):
 def load_game(db_path):
     game = db.get_game(db_path)
     if game is None:
-        game = {"cash": START_CASH, "stock": 0, "day": 1}
+        game = {"cash": START_CASH, "stock": 0, "day": 1, "price": REFERENCE_PRICE}
         db.save_game(db_path, game)
     return game
 
@@ -36,10 +35,23 @@ def buy(db_path, quantity):
     return game
 
 
+def set_price(db_path, price):
+    if isinstance(price, bool) or not isinstance(price, (int, float)):
+        raise ValueError("Price must be a number.")
+    if price <= 0:
+        raise ValueError("Price must be more than €0.")
+    if round(price, 2) != price:
+        raise ValueError("Price can have at most 2 decimals.")
+    game = load_game(db_path)
+    game["price"] = float(price)
+    db.save_game(db_path, game)
+    return game
+
+
 def trade_day(db_path):
     game = load_game(db_path)
-    units_sold = min(demand(PRICE, REFERENCE_PRICE), game["stock"])
-    revenue = round(units_sold * PRICE, 2)
+    units_sold = min(demand(game["price"], REFERENCE_PRICE), game["stock"])
+    revenue = round(units_sold * game["price"], 2)
     cogs = round(units_sold * UNIT_COST, 2)
     result = {
         "day": game["day"],
