@@ -14,8 +14,22 @@ col1.metric("Cash", f"€{game['cash']:.2f}")
 col2.metric("Café stock", game["stock"])
 col3.metric("Day", game["day"])
 
+st.subheader("Selling price")
+st.write(f"Current price €{game['price']:.2f}")
+st.caption(
+    f"Demand per day: 10 units at or below €{logic.REFERENCE_PRICE:.2f}, "
+    f"5 units up to €{2 * logic.REFERENCE_PRICE:.2f}, 0 units above that."
+)
+new_price = st.number_input("Price (€)", step=0.01, value=game["price"], format="%.2f")
+if st.button("Set price"):
+    try:
+        logic.set_price(DB_PATH, round(float(new_price), 2))
+        st.rerun()
+    except ValueError as error:
+        st.error(str(error))
+
 st.subheader("Buy Café")
-st.write(f"Unit cost €{logic.UNIT_COST:.2f} · Selling price €{logic.PRICE:.2f}")
+st.write(f"Unit cost €{logic.UNIT_COST:.2f}")
 quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
 if st.button("Buy"):
     try:

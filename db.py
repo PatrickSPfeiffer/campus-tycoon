@@ -15,7 +15,8 @@ def connect(db_path):
         " id INTEGER PRIMARY KEY CHECK (id = 1),"
         " cash REAL NOT NULL,"
         " stock INTEGER NOT NULL,"
-        " day INTEGER NOT NULL)"
+        " day INTEGER NOT NULL,"
+        " price REAL NOT NULL)"
     )
     conn.execute(
         "CREATE TABLE IF NOT EXISTS results ("
@@ -30,18 +31,23 @@ def connect(db_path):
 
 def get_game(db_path):
     with connect(db_path) as conn:
-        row = conn.execute("SELECT cash, stock, day FROM game WHERE id = 1").fetchone()
+        row = conn.execute("SELECT cash, stock, day, price FROM game WHERE id = 1").fetchone()
     conn.close()
     if row is None:
         return None
-    return {"cash": float(row["cash"]), "stock": row["stock"], "day": row["day"]}
+    return {
+        "cash": float(row["cash"]),
+        "stock": row["stock"],
+        "day": row["day"],
+        "price": float(row["price"]),
+    }
 
 
 def save_game(db_path, game):
     with connect(db_path) as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO game (id, cash, stock, day) VALUES (1, ?, ?, ?)",
-            (game["cash"], game["stock"], game["day"]),
+            "INSERT OR REPLACE INTO game (id, cash, stock, day, price) VALUES (1, ?, ?, ?, ?)",
+            (game["cash"], game["stock"], game["day"], game["price"]),
         )
     conn.close()
 
@@ -51,8 +57,8 @@ def save_day(db_path, game, result):
     # so a day is never saved without its result (or the other way round).
     with connect(db_path) as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO game (id, cash, stock, day) VALUES (1, ?, ?, ?)",
-            (game["cash"], game["stock"], game["day"]),
+            "INSERT OR REPLACE INTO game (id, cash, stock, day, price) VALUES (1, ?, ?, ?, ?)",
+            (game["cash"], game["stock"], game["day"], game["price"]),
         )
         conn.execute(
             "INSERT INTO results (day, units_sold, revenue, cogs, gross_profit)"
