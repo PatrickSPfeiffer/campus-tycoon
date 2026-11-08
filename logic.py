@@ -1,6 +1,7 @@
 import db
 
 START_CASH = 100.0
+RUN_DAYS = 5
 
 # The catalogue: fixed unit cost and reference price per product.
 PRODUCTS = {
@@ -24,16 +25,50 @@ def check_product(product):
         raise ValueError(f"Unknown product: {product}.")
 
 
+def start_game():
+    # The state at the start of every run.
+    return {
+        "cash": START_CASH,
+        "day": 1,
+        "stock": {name: 0 for name in PRODUCTS},
+        "price": {name: PRODUCTS[name]["reference_price"] for name in PRODUCTS},
+    }
+
+
 def load_game(db_path):
     game = db.get_game(db_path)
     if game is None:
-        game = {
-            "cash": START_CASH,
-            "day": 1,
-            "stock": {name: 0 for name in PRODUCTS},
-            "price": {name: PRODUCTS[name]["reference_price"] for name in PRODUCTS},
-        }
+        game = start_game()
         db.save_game(db_path, game)
+    return game
+
+
+def is_run_complete(game):
+    # "day" is the next day to trade, so after the fifth trade it is 6.
+    return game["day"] > RUN_DAYS
+
+
+def check_run_not_complete(game):
+    if is_run_complete(game):
+        raise ValueError("The run is complete. Start a new run to keep playing.")
+
+
+def final_result(game):
+    # CT R4: remaining stock is valued at purchase cost.
+    stock_at_cost = round(
+        sum(game["stock"][name] * PRODUCTS[name]["unit_cost"] for name in PRODUCTS), 2
+    )
+    return {
+        "final_cash": float(game["cash"]),
+        "stock_at_cost": float(stock_at_cost),
+        "gain": round(game["cash"] + stock_at_cost - START_CASH, 2),
+    }
+
+
+def new_run(db_path):
+    # Back to the start: €100, no stock, reference prices, day 1, empty history.
+    game = start_game()
+    db.reset_game(db_path, game)
     return game
 
 
@@ -47,6 +82,7 @@ def buy(db_path, product, quantity):
     if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
         raise ValueError("Quantity must be a positive whole number.")
     game = load_game(db_path)
+    check_run_not_complete(game)
     cost = buy_cost(product, quantity)
     if cost > game["cash"]:
         raise ValueError(f"Not enough cash: buying costs €{cost:.2f}, you have €{game['cash']:.2f}.")
@@ -85,6 +121,7 @@ def total_of(by_product):
 
 def trade_day(db_path):
     game = load_game(db_path)
+    check_run_not_complete(game)
     by_product = {}
     for name in PRODUCTS:
         price = game["price"][name]

@@ -84,6 +84,14 @@ def save_day(db_path, game, result):
     conn.close()
 
 
+def reset_game(db_path, game):
+    # Clearing the history and writing the new game happen in one transaction.
+    with connect(db_path) as conn:
+        conn.execute("DELETE FROM results")
+        write_game(conn, game)
+    conn.close()
+
+
 def get_result_rows(db_path):
     with connect(db_path) as conn:
         rows = conn.execute(
