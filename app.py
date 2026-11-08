@@ -8,10 +8,38 @@ DB_PATH = db.DEFAULT_PATH
 st.title("Campus Tycoon")
 
 game = logic.load_game(DB_PATH)
+run_complete = logic.is_run_complete(game)
 
 col1, col2 = st.columns(2)
 col1.metric("Cash", f"€{game['cash']:.2f}")
-col2.metric("Day", game["day"])
+if run_complete:
+    col2.metric("Progress", "Run complete")
+else:
+    col2.metric("Progress", f"Day {game['day']} of {logic.RUN_DAYS}")
+
+if run_complete:
+    final = logic.final_result(game)
+    st.subheader("Final result")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Final cash", f"€{final['final_cash']:.2f}")
+    col2.metric("Remaining stock at cost", f"€{final['stock_at_cost']:.2f}")
+    col3.metric("Overall gain or loss", f"€{final['gain']:.2f}")
+
+st.subheader("New run")
+if not st.session_state.get("confirm_new_run"):
+    if st.button("Start a new run"):
+        st.session_state["confirm_new_run"] = True
+        st.rerun()
+else:
+    st.warning("Start a new run? The current run and its history will be lost.")
+    col1, col2 = st.columns(2)
+    if col1.button("Yes, start a new run"):
+        logic.new_run(DB_PATH)
+        st.session_state["confirm_new_run"] = False
+        st.rerun()
+    if col2.button("Cancel"):
+        st.session_state["confirm_new_run"] = False
+        st.rerun()
 
 st.subheader("Products")
 st.table(
@@ -48,7 +76,7 @@ st.subheader("Buy")
 buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
 quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
 st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
-if st.button("Buy"):
+if st.button("Buy", disabled=run_complete):
     try:
         logic.buy(DB_PATH, buy_product, int(quantity))
         st.rerun()
@@ -56,9 +84,12 @@ if st.button("Buy"):
         st.error(str(error))
 
 st.subheader("Trade")
-if st.button("Trade one day"):
-    logic.trade_day(DB_PATH)
-    st.rerun()
+if st.button("Trade one day", disabled=run_complete):
+    try:
+        logic.trade_day(DB_PATH)
+        st.rerun()
+    except ValueError as error:
+        st.error(str(error))
 
 st.subheader("Results")
 for result in logic.get_results(DB_PATH):
