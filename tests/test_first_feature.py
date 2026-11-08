@@ -8,20 +8,20 @@ def test_buy_within_budget_then_reject_unaffordable(tmp_path):
     game = logic.load_game(db_path)
     assert game["cash"] == 100.0
     assert isinstance(game["cash"], float)
-    assert game["stock"] == 0
+    assert game["stock"]["Café"] == 0
     assert game["day"] == 1
 
-    game = logic.buy(db_path, 10)
+    game = logic.buy(db_path, "Café", 10)
     assert game["cash"] == 80.0
     assert isinstance(game["cash"], float)
-    assert game["stock"] == 10
+    assert game["stock"]["Café"] == 10
 
     with pytest.raises(ValueError):
-        logic.buy(db_path, 41)
+        logic.buy(db_path, "Café", 41)
 
     game = logic.load_game(db_path)
     assert game["cash"] == 80.0
-    assert game["stock"] == 10
+    assert game["stock"]["Café"] == 10
 
 
 def test_reject_invalid_quantities(tmp_path):
@@ -30,73 +30,73 @@ def test_reject_invalid_quantities(tmp_path):
 
     for quantity in [0, -5, 2.5]:
         with pytest.raises(ValueError):
-            logic.buy(db_path, quantity)
+            logic.buy(db_path, "Café", quantity)
 
     game = logic.load_game(db_path)
     assert game["cash"] == 100.0
-    assert game["stock"] == 0
+    assert game["stock"]["Café"] == 0
 
 
 def test_trade_one_day(tmp_path):
     db_path = tmp_path / "game.db"
     logic.load_game(db_path)
-    logic.buy(db_path, 10)
+    logic.buy(db_path, "Café", 10)
 
     result = logic.trade_day(db_path)
     assert result["day"] == 1
-    assert result["units_sold"] == 10
-    assert result["revenue"] == 40.0
-    assert result["cogs"] == 20.0
-    assert result["gross_profit"] == 20.0
+    assert result["by_product"]["Café"]["units_sold"] == 10
+    assert result["by_product"]["Café"]["revenue"] == 40.0
+    assert result["by_product"]["Café"]["cogs"] == 20.0
+    assert result["by_product"]["Café"]["gross_profit"] == 20.0
     for key in ["revenue", "cogs", "gross_profit"]:
-        assert isinstance(result[key], float)
+        assert isinstance(result["by_product"]["Café"][key], float)
 
     game = logic.load_game(db_path)
     assert game["cash"] == 120.0
     assert isinstance(game["cash"], float)
-    assert game["stock"] == 0
+    assert game["stock"]["Café"] == 0
     assert game["day"] == 2
 
 
 def test_restart_keeps_progress_without_replaying_the_day(tmp_path):
     db_path = tmp_path / "game.db"
     logic.load_game(db_path)
-    logic.buy(db_path, 10)
+    logic.buy(db_path, "Café", 10)
     logic.trade_day(db_path)
 
     # Restart: open the same database file again.
     game = logic.load_game(db_path)
     assert game["cash"] == 120.0
-    assert game["stock"] == 0
+    assert game["stock"]["Café"] == 0
     assert game["day"] == 2
 
     results = logic.get_results(db_path)
     assert [r["day"] for r in results] == [1]
-    assert results[0]["units_sold"] == 10
-    assert results[0]["revenue"] == 40.0
-    assert results[0]["cogs"] == 20.0
-    assert results[0]["gross_profit"] == 20.0
+    assert results[0]["by_product"]["Café"]["units_sold"] == 10
+    assert results[0]["by_product"]["Café"]["revenue"] == 40.0
+    assert results[0]["by_product"]["Café"]["cogs"] == 20.0
+    assert results[0]["by_product"]["Café"]["gross_profit"] == 20.0
 
 
 def test_stock_limits_sales(tmp_path):
     # Each case gets its own database file.
     few_db = tmp_path / "few.db"
     logic.load_game(few_db)
-    logic.buy(few_db, 3)
+    logic.buy(few_db, "Café", 3)
     result = logic.trade_day(few_db)
-    assert result["units_sold"] == 3
+    assert result["by_product"]["Café"]["units_sold"] == 3
     game = logic.load_game(few_db)
     assert game["cash"] == 106.0
-    assert game["stock"] == 0
+    assert game["stock"]["Café"] == 0
 
     many_db = tmp_path / "many.db"
     logic.load_game(many_db)
-    logic.buy(many_db, 15)
+    logic.buy(many_db, "Café", 15)
     result = logic.trade_day(many_db)
-    assert result["units_sold"] == 10
+    assert result["by_product"]["Café"]["units_sold"] == 10
     game = logic.load_game(many_db)
     assert game["cash"] == 110.0
-    assert game["stock"] == 5
+    assert game["stock"]["Café"] == 5
 
 
 def test_demand_boundaries():
