@@ -7,7 +7,11 @@ DB_PATH = db.DEFAULT_PATH
 
 st.title("Campus Tycoon")
 
-game = logic.load_game(DB_PATH)
+try:
+    game = logic.load_game(DB_PATH)
+except db.DatabaseUnavailable as error:
+    st.error(str(error))
+    st.stop()
 run_complete = logic.is_run_complete(game)
 
 col1, col2 = st.columns(2)
@@ -34,9 +38,12 @@ else:
     st.warning("Start a new run? The current run and its history will be lost.")
     col1, col2 = st.columns(2)
     if col1.button("Yes, start a new run"):
-        logic.new_run(DB_PATH)
-        st.session_state["confirm_new_run"] = False
-        st.rerun()
+        try:
+            logic.new_run(DB_PATH)
+            st.session_state["confirm_new_run"] = False
+            st.rerun()
+        except db.DatabaseUnavailable as error:
+            st.error(str(error))
     if col2.button("Cancel"):
         st.session_state["confirm_new_run"] = False
         st.rerun()
@@ -69,7 +76,7 @@ if st.button("Set price"):
     try:
         logic.set_price(DB_PATH, price_product, round(float(new_price), 2))
         st.rerun()
-    except ValueError as error:
+    except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
 
 st.subheader("Buy")
@@ -80,7 +87,7 @@ if st.button("Buy", disabled=run_complete):
     try:
         logic.buy(DB_PATH, buy_product, int(quantity))
         st.rerun()
-    except ValueError as error:
+    except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
 
 st.subheader("Trade")
@@ -88,11 +95,16 @@ if st.button("Trade one day", disabled=run_complete):
     try:
         logic.trade_day(DB_PATH)
         st.rerun()
-    except ValueError as error:
+    except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
 
 st.subheader("Results")
-for result in logic.get_results(DB_PATH):
+try:
+    results = logic.get_results(DB_PATH)
+except db.DatabaseUnavailable as error:
+    st.error(str(error))
+    results = []
+for result in results:
     st.write(f"Day {result['day']}")
     rows = []
     for name, line in list(result["by_product"].items()) + [("Total", result["total"])]:
