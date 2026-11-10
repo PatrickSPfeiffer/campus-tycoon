@@ -78,27 +78,77 @@ def connect(db_path):
 
 
 def create_tables(conn):
+    # Practice: one game per player. Every row belongs to one player (their email).
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS game ("
-        " id INTEGER PRIMARY KEY CHECK (id = 1),"
+        "CREATE TABLE IF NOT EXISTS players ("
+        " email TEXT PRIMARY KEY,"
+        " name TEXT NOT NULL)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS games ("
+        " player TEXT PRIMARY KEY,"
         " cash REAL NOT NULL,"
         " day INTEGER NOT NULL)"
     )
     conn.execute(
         "CREATE TABLE IF NOT EXISTS products ("
-        " name TEXT PRIMARY KEY,"
+        " player TEXT NOT NULL,"
+        " product TEXT NOT NULL,"
         " stock INTEGER NOT NULL,"
-        " price REAL NOT NULL)"
+        " price REAL NOT NULL,"
+        " PRIMARY KEY (player, product))"
     )
     conn.execute(
         "CREATE TABLE IF NOT EXISTS results ("
+        " player TEXT NOT NULL,"
         " day INTEGER NOT NULL,"
         " product TEXT NOT NULL,"
         " units_sold INTEGER NOT NULL,"
         " revenue REAL NOT NULL,"
         " cogs REAL NOT NULL,"
         " gross_profit REAL NOT NULL,"
-        " PRIMARY KEY (day, product))"
+        " PRIMARY KEY (player, day, product))"
+    )
+    # Tournaments: created now, used from a later feature. See docs/data-model.md.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS tournaments ("
+        " id INTEGER PRIMARY KEY NOT NULL,"
+        " name TEXT NOT NULL,"
+        " code TEXT NOT NULL UNIQUE,"
+        " organiser TEXT NOT NULL,"
+        " day INTEGER NOT NULL)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS stands ("
+        " tournament_id INTEGER NOT NULL,"
+        " player TEXT NOT NULL,"
+        " seat INTEGER NOT NULL,"
+        " cash REAL NOT NULL,"
+        " ready INTEGER NOT NULL CHECK (ready IN (0, 1)),"
+        " PRIMARY KEY (tournament_id, player),"
+        " UNIQUE (tournament_id, seat))"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS stand_products ("
+        " tournament_id INTEGER NOT NULL,"
+        " player TEXT NOT NULL,"
+        " product TEXT NOT NULL,"
+        " stock INTEGER NOT NULL,"
+        " price REAL NOT NULL,"
+        " PRIMARY KEY (tournament_id, player, product))"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS tournament_results ("
+        " tournament_id INTEGER NOT NULL,"
+        " day INTEGER NOT NULL,"
+        " player TEXT NOT NULL,"
+        " product TEXT NOT NULL,"
+        " price REAL NOT NULL,"
+        " units_sold INTEGER NOT NULL,"
+        " revenue REAL NOT NULL,"
+        " cogs REAL NOT NULL,"
+        " gross_profit REAL NOT NULL,"
+        " PRIMARY KEY (tournament_id, day, player, product))"
     )
 
 
@@ -122,11 +172,15 @@ def open_database(db_path):
 
 # Rows are read by position, because libsql returns plain tuples
 # where sqlite3 could return rows with names.
+# Every practice function takes the player (their email) and only
+# reads or changes that player's rows.
 
-def get_game(db_path):
+def get_game(db_path, player):
     with open_database(db_path) as conn:
-        row = conn.execute("SELECT cash, day FROM game WHERE id = 1").fetchone()
-        products = conn.execute("SELECT name, stock, price FROM products").fetchall()
+        row = conn.execute("SELECT cash, day FROM games WHERE player = ?", (player,)).fetchone()
+        products = conn.execute(
+            "SELECT product, stock, price FROM products WHERE player = ?", (player,)
+        ).fetchall()
     if row is None:
         return None
     return {
@@ -137,50 +191,62 @@ def get_game(db_path):
     }
 
 
-def write_game(conn, game):
+def write_game(conn, player, game):
     conn.execute(
-        "INSERT OR REPLACE INTO game (id, cash, day) VALUES (1, ?, ?)",
-        (game["cash"], game["day"]),
+        "INSERT OR REPLACE INTO games (player, cash, day) VALUES (?, ?, ?)",
+        (player, game["cash"], game["day"]),
     )
     for name in game["stock"]:
         conn.execute(
-            "INSERT OR REPLACE INTO products (name, stock, price) VALUES (?, ?, ?)",
-            (name, game["stock"][name], game["price"][name]),
+            "INSERT OR REPLACE INTO products (player, product, stock, price) VALUES (?, ?, ?, ?)",
+            (player, name, game["stock"][name], game["price"][name]),
         )
 
 
-def save_game(db_path, game):
+def add_player(db_path, player, name, game):
+    # The player and their first game are saved in one transaction.
+    # A player who is already in players keeps their name.
     with open_database(db_path) as conn:
-        write_game(conn, game)
+        conn.execute(
+            "INSERT OR IGNORE INTO players (email, name) VALUES (?, ?)", (player, name)
+        )
+        write_game(conn, player, game)
 
 
-def save_day(db_path, game, result):
+def save_game(db_path, player, game):
+    with open_database(db_path) as conn:
+        write_game(conn, player, game)
+
+
+def save_day(db_path, player, game, result):
     # Game state and the day's results are written in one transaction,
     # so a day is never saved without its results (or the other way round).
-    # The primary key (day, product) stops a day from being recorded twice.
+    # The primary key (player, day, product) stops a day from being recorded twice.
     with open_database(db_path) as conn:
-        write_game(conn, game)
+        write_game(conn, player, game)
         for name, line in result["by_product"].items():
             conn.execute(
-                "INSERT INTO results (day, product, units_sold, revenue, cogs, gross_profit)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
-                (result["day"], name, line["units_sold"], line["revenue"],
+                "INSERT INTO results"
+                " (player, day, product, units_sold, revenue, cogs, gross_profit)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (player, result["day"], name, line["units_sold"], line["revenue"],
                  line["cogs"], line["gross_profit"]),
             )
 
 
-def reset_game(db_path, game):
-    # Clearing the history and writing the new game happen in one transaction.
+def reset_game(db_path, player, game):
+    # Clearing this player's history and writing their new game happen in one transaction.
     with open_database(db_path) as conn:
-        conn.execute("DELETE FROM results")
-        write_game(conn, game)
+        conn.execute("DELETE FROM results WHERE player = ?", (player,))
+        write_game(conn, player, game)
 
 
-def get_result_rows(db_path):
+def get_result_rows(db_path, player):
     with open_database(db_path) as conn:
         rows = conn.execute(
             "SELECT day, product, units_sold, revenue, cogs, gross_profit"
-            " FROM results ORDER BY day, rowid"
+            " FROM results WHERE player = ? ORDER BY day, rowid",
+            (player,),
         ).fetchall()
     return [
         {

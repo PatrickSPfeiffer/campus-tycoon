@@ -4,11 +4,13 @@ import db
 import logic
 
 DB_PATH = db.DEFAULT_PATH
+# Until sign-in exists (feature 8), everyone plays as one fixed player.
+PLAYER = "guest"
 
 st.title("Campus Tycoon")
 
 try:
-    game = logic.load_game(DB_PATH)
+    game = logic.load_game(DB_PATH, PLAYER)
 except db.DatabaseUnavailable as error:
     st.error(str(error))
     st.stop()
@@ -39,7 +41,7 @@ else:
     col1, col2 = st.columns(2)
     if col1.button("Yes, start a new run"):
         try:
-            logic.new_run(DB_PATH)
+            logic.new_run(DB_PATH, PLAYER)
             st.session_state["confirm_new_run"] = False
             st.rerun()
         except db.DatabaseUnavailable as error:
@@ -74,7 +76,7 @@ new_price = st.number_input(
 )
 if st.button("Set price"):
     try:
-        logic.set_price(DB_PATH, price_product, round(float(new_price), 2))
+        logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
         st.rerun()
     except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
@@ -85,7 +87,7 @@ quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
 st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
 if st.button("Buy", disabled=run_complete):
     try:
-        logic.buy(DB_PATH, buy_product, int(quantity))
+        logic.buy(DB_PATH, PLAYER, buy_product, int(quantity))
         st.rerun()
     except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
@@ -93,14 +95,14 @@ if st.button("Buy", disabled=run_complete):
 st.subheader("Trade")
 if st.button("Trade one day", disabled=run_complete):
     try:
-        logic.trade_day(DB_PATH)
+        logic.trade_day(DB_PATH, PLAYER)
         st.rerun()
     except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
 
 st.subheader("Results")
 try:
-    results = logic.get_results(DB_PATH)
+    results = logic.get_results(DB_PATH, PLAYER)
 except db.DatabaseUnavailable as error:
     st.error(str(error))
     results = []
