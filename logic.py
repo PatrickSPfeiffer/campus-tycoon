@@ -2,6 +2,7 @@ import db
 
 START_CASH = 100.0
 RUN_DAYS = 5
+MAX_PLAYER_LENGTH = 254
 
 # The catalogue: fixed unit cost and reference price per product.
 PRODUCTS = {
@@ -25,6 +26,19 @@ def check_product(product):
         raise ValueError(f"Unknown product: {product}.")
 
 
+def check_player(player):
+    # The player is their email: non-empty text of at most 254 characters.
+    if not isinstance(player, str) or player.strip() == "":
+        raise ValueError("Player must be a non-empty email.")
+    if len(player) > MAX_PLAYER_LENGTH:
+        raise ValueError(f"Player can have at most {MAX_PLAYER_LENGTH} characters.")
+
+
+def player_name(player):
+    # The part of the email before "@"; without "@", the whole text.
+    return player.split("@")[0]
+
+
 def start_game():
     # The state at the start of every run.
     return {
@@ -35,11 +49,13 @@ def start_game():
     }
 
 
-def load_game(db_path):
-    game = db.get_game(db_path)
+def load_game(db_path, player):
+    check_player(player)
+    game = db.get_game(db_path, player)
     if game is None:
+        # First time: add the player and give them a new practice game.
         game = start_game()
-        db.save_game(db_path, game)
+        db.add_player(db_path, player, player_name(player), game)
     return game
 
 
@@ -65,10 +81,12 @@ def final_result(game):
     }
 
 
-def new_run(db_path):
+def new_run(db_path, player):
     # Back to the start: €100, no stock, reference prices, day 1, empty history.
+    # Loading first makes sure the player is in players.
+    load_game(db_path, player)
     game = start_game()
-    db.reset_game(db_path, game)
+    db.reset_game(db_path, player, game)
     return game
 
 
@@ -77,22 +95,24 @@ def buy_cost(product, quantity):
     return round(quantity * PRODUCTS[product]["unit_cost"], 2)
 
 
-def buy(db_path, product, quantity):
+def buy(db_path, player, product, quantity):
+    check_player(player)
     check_product(product)
     if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
         raise ValueError("Quantity must be a positive whole number.")
-    game = load_game(db_path)
+    game = load_game(db_path, player)
     check_run_not_complete(game)
     cost = buy_cost(product, quantity)
     if cost > game["cash"]:
         raise ValueError(f"Not enough cash: buying costs €{cost:.2f}, you have €{game['cash']:.2f}.")
     game["cash"] = round(game["cash"] - cost, 2)
     game["stock"][product] = game["stock"][product] + quantity
-    db.save_game(db_path, game)
+    db.save_game(db_path, player, game)
     return game
 
 
-def set_price(db_path, product, price):
+def set_price(db_path, player, product, price):
+    check_player(player)
     check_product(product)
     if isinstance(price, bool) or not isinstance(price, (int, float)):
         raise ValueError("Price must be a number.")
@@ -100,9 +120,9 @@ def set_price(db_path, product, price):
         raise ValueError("Price must be more than €0.")
     if round(price, 2) != price:
         raise ValueError("Price can have at most 2 decimals.")
-    game = load_game(db_path)
+    game = load_game(db_path, player)
     game["price"][product] = float(price)
-    db.save_game(db_path, game)
+    db.save_game(db_path, player, game)
     return game
 
 
@@ -119,8 +139,8 @@ def total_of(by_product):
     }
 
 
-def trade_day(db_path):
-    game = load_game(db_path)
+def trade_day(db_path, player):
+    game = load_game(db_path, player)
     check_run_not_complete(game)
     by_product = {}
     for name in PRODUCTS:
@@ -138,14 +158,15 @@ def trade_day(db_path):
     result = {"day": game["day"], "by_product": by_product, "total": total_of(by_product)}
     game["cash"] = round(game["cash"] + result["total"]["revenue"], 2)
     game["day"] = game["day"] + 1
-    db.save_day(db_path, game, result)
+    db.save_day(db_path, player, game, result)
     return result
 
 
-def get_results(db_path):
+def get_results(db_path, player):
     # The database keeps one row per day and product; group them by day.
+    check_player(player)
     results = []
-    for row in db.get_result_rows(db_path):
+    for row in db.get_result_rows(db_path, player):
         if not results or results[-1]["day"] != row["day"]:
             results.append({"day": row["day"], "by_product": {}})
         results[-1]["by_product"][row["product"]] = {

@@ -18,8 +18,9 @@ game, and tournaments need tables that the teammates building them can rely on.
       UNIQUE (tournament_id, seat));
       stand_products (tournament_id, player, product, stock, price;
       PRIMARY KEY (tournament_id, player, product));
-      tournament_results (tournament_id, day, player, product, units_sold, revenue, cogs,
-      gross_profit; PRIMARY KEY (tournament_id, day, player, product)).
+      tournament_results (tournament_id, day, player, product, price, units_sold, revenue,
+      cogs, gross_profit; PRIMARY KEY (tournament_id, day, player, product)).
+      price is the price the stand had that day.
       seat is the joining order (1, 2, 3…), used by rule M3 and the ranking.
 - [ ] Every column in the tournament tables is NOT NULL. Types: name, code, organiser and
       player TEXT; day, seat, stock and ready INTEGER (ready is 0 or 1); cash and price REAL.
