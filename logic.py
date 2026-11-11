@@ -1,3 +1,5 @@
+import csv
+import io
 import secrets
 
 import db
@@ -252,3 +254,46 @@ def get_results(db_path, player):
     for result in results:
         result["total"] = total_of(result["by_product"])
     return results
+
+
+def build_run_report_csv(rows):
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerow(
+        ["day", "product", "units_sold", "price", "revenue", "cogs", "gross_profit"]
+    )
+
+    total_units_sold = 0
+    total_revenue = 0.0
+    total_cogs = 0.0
+    total_gross_profit = 0.0
+    report_rows = []
+    for result in rows:
+        for product, line in result["by_product"].items():
+            units_sold = line["units_sold"]
+            revenue = round(line["revenue"], 2)
+            cogs = round(line["cogs"], 2)
+            gross_profit = round(line["gross_profit"], 2)
+            price = "" if units_sold == 0 else round(revenue / units_sold, 2)
+            report_rows.append(
+                (result["day"], product, units_sold, price, revenue, cogs, gross_profit)
+            )
+            total_units_sold += units_sold
+            total_revenue = round(total_revenue + revenue, 2)
+            total_cogs = round(total_cogs + cogs, 2)
+            total_gross_profit = round(total_gross_profit + gross_profit, 2)
+
+    for report_row in sorted(report_rows, key=lambda row: (row[0], row[1])):
+        writer.writerow(report_row)
+    writer.writerow(
+        [
+            "TOTAL",
+            "",
+            total_units_sold,
+            "",
+            round(total_revenue, 2),
+            round(total_cogs, 2),
+            round(total_gross_profit, 2),
+        ]
+    )
+    return output.getvalue()

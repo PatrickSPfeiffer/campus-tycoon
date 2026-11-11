@@ -140,6 +140,14 @@ for result in results:
         )
     st.table(rows)
 
+if run_complete:
+    st.download_button(
+        "Download run report (CSV)",
+        data=logic.build_run_report_csv(results).encode("utf-8-sig"),
+        file_name="run_report.csv",
+        mime="text/csv",
+    )
+
 st.subheader("Tournaments")
 
 st.write("Create a tournament")
