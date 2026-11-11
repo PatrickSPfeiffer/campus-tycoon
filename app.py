@@ -139,3 +139,58 @@ for result in results:
             }
         )
     st.table(rows)
+
+st.subheader("Tournaments")
+
+st.write("Create a tournament")
+tournament_name = st.text_input("Tournament name", key="tournament_name")
+if st.button("Create tournament"):
+    try:
+        created = logic.create_tournament(DB_PATH, PLAYER, tournament_name)
+        st.session_state["created_tournament"] = created
+        st.rerun()
+    except (ValueError, db.DatabaseUnavailable) as error:
+        st.error(str(error))
+
+created = st.session_state.get("created_tournament")
+if created:
+    st.success(f"Tournament created: {created['name']}")
+    st.subheader(f"Join code: {created['code']}")
+
+joined_message = st.session_state.pop("joined_message", None)
+if joined_message:
+    st.success(joined_message)
+
+st.write("Join a tournament")
+join_code = st.text_input("Join code", key="tournament_join_code")
+if st.button("Join tournament"):
+    try:
+        joined = logic.join_tournament(DB_PATH, PLAYER, join_code)
+        st.session_state["joined_message"] = (
+            f"Joined {joined['name']} in seat {joined['seat']}."
+        )
+        st.rerun()
+    except (ValueError, db.DatabaseUnavailable) as error:
+        st.error(str(error))
+
+try:
+    my_stands = logic.get_my_stands(DB_PATH, PLAYER)
+except db.DatabaseUnavailable as error:
+    st.error(str(error))
+    my_stands = []
+
+if my_stands:
+    st.write("My tournament stands")
+    for stand in my_stands:
+        st.write(f"{stand['name']} — seat {stand['seat']}, day {stand['day']}")
+        st.write(f"Cash: €{stand['cash']:.2f}")
+        st.table(
+            [
+                {
+                    "Product": product["product"],
+                    "Stock": product["stock"],
+                    "Price": f"€{product['price']:.2f}",
+                }
+                for product in stand["products"]
+            ]
+        )

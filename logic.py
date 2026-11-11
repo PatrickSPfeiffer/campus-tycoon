@@ -1,8 +1,12 @@
+import secrets
+
 import db
 
 START_CASH = 100.0
 RUN_DAYS = 5
 MAX_PLAYER_LENGTH = 254
+MAX_TOURNAMENT_NAME_LENGTH = 40
+JOIN_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 # The catalogue: fixed unit cost and reference price per product.
 PRODUCTS = {
@@ -60,6 +64,63 @@ def start_game():
         "stock": {name: 0 for name in PRODUCTS},
         "price": {name: PRODUCTS[name]["reference_price"] for name in PRODUCTS},
     }
+
+
+def check_tournament_name(name):
+    if not isinstance(name, str) or name.strip() == "":
+        raise ValueError("Tournament name must be a non-empty name.")
+    name = name.strip()
+    if len(name) > MAX_TOURNAMENT_NAME_LENGTH:
+        raise ValueError(
+            f"Tournament name can have at most {MAX_TOURNAMENT_NAME_LENGTH} characters."
+        )
+    return name
+
+
+def clean_join_code(code):
+    if not isinstance(code, str):
+        raise ValueError("Tournament code must be text.")
+    return code.strip().upper()
+
+
+def generate_join_code():
+    return "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(6))
+
+
+def create_tournament(db_path, organiser, name):
+    check_player(organiser)
+    name = check_tournament_name(name)
+    for _ in range(10):
+        code = generate_join_code()
+        if db.get_tournament_by_code(db_path, code) is None:
+            return db.create_tournament(db_path, name, code, organiser, 1)
+    raise ValueError("Could not generate a unique tournament code.")
+
+
+def join_tournament(db_path, player, code):
+    check_player(player)
+    code = clean_join_code(code)
+    tournament = db.get_tournament_by_code(db_path, code)
+    if tournament is None:
+        raise ValueError("Tournament code was not found.")
+    if tournament["day"] != 1:
+        raise ValueError("Joining is closed because day 1 has ended.")
+    if db.stand_exists(db_path, tournament["id"], player):
+        raise ValueError("You have already joined this tournament.")
+    products = {
+        name: {"stock": 0, "price": details["reference_price"]}
+        for name, details in PRODUCTS.items()
+    }
+    seat = db.join_tournament(db_path, tournament["id"], player, START_CASH, 0, products)
+    return {**tournament, "seat": seat}
+
+
+def get_my_stands(db_path, player):
+    check_player(player)
+    stands = db.get_player_stands(db_path, player)
+    for stand in stands:
+        stand["products"] = db.get_stand_products(db_path, stand["id"], player)
+    return stands
 
 
 def load_game(db_path, player):
