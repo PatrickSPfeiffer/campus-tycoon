@@ -37,6 +37,8 @@ first. To test as several players, use private windows with different Google acc
 
     uv run pytest
 
+Tests also run automatically on every pull request in GitHub Actions.
+
 ## Project structure
 
 - `app.py`: the Streamlit screens
