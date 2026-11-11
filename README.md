@@ -16,13 +16,22 @@ all players share the same customers, so the cheapest stand sells first.
 | Zoe Mormile | 65404 |
 | Edoardo Giovanni Panetta | 72795 |
 
-## Run the app
+## Run the app locally
 
-You need [uv](https://docs.astral.sh/uv/). In the project folder:
+You need [uv](https://docs.astral.sh/uv/) and a secrets file that git ignores:
+
+1. Copy `.streamlit/secrets.example.toml` to `.streamlit/secrets.toml`.
+2. Delete the two `TURSO_...` lines. Without them the app uses a local SQLite file
+   (`data/game.db`), so your tests by hand never touch the real data.
+3. Fill in the `[auth]` section with the Google sign-in values. Ask Patrick for them
+   in a private message. Never commit this file or share it in a group chat.
+
+Then, in the project folder:
 
     uv run streamlit run app.py
 
-The app opens in your browser at http://localhost:8501.
+Open http://localhost:8501. Sign-in only works on port 8501, so close other Streamlit apps
+first. To test as several players, use private windows with different Google accounts.
 
 ## Run the tests
 
