@@ -9,7 +9,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "libsql>=0.1.11",
-    "streamlit>=1.65.0",
+    "streamlit[auth]>=1.65.0",
 ]
 
 [dependency-groups]

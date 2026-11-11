@@ -4,10 +4,29 @@ import db
 import logic
 
 DB_PATH = db.DEFAULT_PATH
-# Until sign-in exists (feature 8), everyone plays as one fixed player.
-PLAYER = "guest"
 
 st.title("Campus Tycoon")
+
+# Before signing in: only a short welcome and the sign-in button, no game data.
+if not st.user.is_logged_in:
+    st.write("Welcome! Run a small campus shop for five days. Sign in to play.")
+    if st.button("Sign in with Google"):
+        st.login()
+    st.stop()
+
+# The player is always the signed-in Google email, never typed in.
+try:
+    PLAYER = logic.player_from_user(st.user)
+except ValueError as error:
+    st.error(str(error))
+    if st.button("Sign out"):
+        st.logout()
+    st.stop()
+
+col1, col2 = st.columns([3, 1])
+col1.caption(f"Signed in as {PLAYER}")
+if col2.button("Sign out"):
+    st.logout()
 
 try:
     game = logic.load_game(DB_PATH, PLAYER)
