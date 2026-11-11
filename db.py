@@ -170,6 +170,75 @@ def open_database(db_path):
         conn.close()
 
 
+def get_tournament_by_code(db_path, code):
+    with open_database(db_path) as conn:
+        row = conn.execute(
+            "SELECT id, name, code, organiser, day FROM tournaments WHERE code = ?",
+            (code,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {
+        "id": row[0],
+        "name": row[1],
+        "code": row[2],
+        "organiser": row[3],
+        "day": row[4],
+    }
+
+
+def create_tournament(db_path, name, code, organiser, day):
+    with open_database(db_path) as conn:
+        cursor = conn.execute(
+            "INSERT INTO tournaments (name, code, organiser, day) VALUES (?, ?, ?, ?)",
+            (name, code, organiser, day),
+        )
+        tournament_id = cursor.lastrowid
+    return {
+        "id": tournament_id,
+        "name": name,
+        "code": code,
+        "organiser": organiser,
+        "day": day,
+    }
+
+
+def stand_exists(db_path, tournament_id, player):
+    with open_database(db_path) as conn:
+        row = conn.execute(
+            "SELECT 1 FROM stands WHERE tournament_id = ? AND player = ?",
+            (tournament_id, player),
+        ).fetchone()
+    return row is not None
+
+
+def join_tournament(db_path, tournament_id, player, cash, ready, products):
+    with open_database(db_path) as conn:
+        existing = conn.execute(
+            "SELECT 1 FROM stands WHERE tournament_id = ? AND player = ?",
+            (tournament_id, player),
+        ).fetchone()
+        if existing is not None:
+            raise ValueError("You have already joined this tournament.")
+
+        next_seat = conn.execute(
+            "SELECT COALESCE(MAX(seat), 0) + 1 FROM stands WHERE tournament_id = ?",
+            (tournament_id,),
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO stands (tournament_id, player, seat, cash, ready)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (tournament_id, player, next_seat, cash, ready),
+        )
+        for name, product in products.items():
+            conn.execute(
+                "INSERT INTO stand_products"
+                " (tournament_id, player, product, stock, price)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (tournament_id, player, name, product["stock"], product["price"]),
+            )
+
+
 # Rows are read by position, because libsql returns plain tuples
 # where sqlite3 could return rows with names.
 # Every practice function takes the player (their email) and only
