@@ -34,6 +34,19 @@ def check_player(player):
         raise ValueError(f"Player can have at most {MAX_PLAYER_LENGTH} characters.")
 
 
+def player_from_user(user):
+    # The signed-in user (st.user, or any mapping like it) becomes the player:
+    # their email, trimmed and lowercased.
+    if not user.get("is_logged_in"):
+        raise ValueError("Sign in to play.")
+    if user.get("email_verified") is False:
+        raise ValueError("Your Google email is not verified.")
+    email = user.get("email")
+    if not isinstance(email, str) or email.strip() == "":
+        raise ValueError("Your Google account has no email.")
+    return email.strip().lower()
+
+
 def player_name(player):
     # The part of the email before "@"; without "@", the whole text.
     return player.split("@")[0]
