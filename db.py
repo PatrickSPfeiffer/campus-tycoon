@@ -212,6 +212,42 @@ def stand_exists(db_path, tournament_id, player):
     return row is not None
 
 
+def get_player_stands(db_path, player):
+    with open_database(db_path) as conn:
+        rows = conn.execute(
+            "SELECT tournaments.id, tournaments.name, tournaments.code, "
+            "tournaments.day, stands.seat, stands.cash, stands.ready "
+            "FROM tournaments JOIN stands ON stands.tournament_id = tournaments.id "
+            "WHERE stands.player = ? ORDER BY tournaments.id",
+            (player,),
+        ).fetchall()
+    return [
+        {
+            "id": row[0],
+            "name": row[1],
+            "code": row[2],
+            "day": row[3],
+            "seat": row[4],
+            "cash": float(row[5]),
+            "ready": row[6],
+        }
+        for row in rows
+    ]
+
+
+def get_stand_products(db_path, tournament_id, player):
+    with open_database(db_path) as conn:
+        rows = conn.execute(
+            "SELECT product, stock, price FROM stand_products "
+            "WHERE tournament_id = ? AND player = ? ORDER BY product",
+            (tournament_id, player),
+        ).fetchall()
+    return [
+        {"product": row[0], "stock": row[1], "price": float(row[2])}
+        for row in rows
+    ]
+
+
 def join_tournament(db_path, tournament_id, player, cash, ready, products):
     with open_database(db_path) as conn:
         existing = conn.execute(
@@ -237,6 +273,7 @@ def join_tournament(db_path, tournament_id, player, cash, ready, products):
                 " VALUES (?, ?, ?, ?, ?)",
                 (tournament_id, player, name, product["stock"], product["price"]),
             )
+    return next_seat
 
 
 # Rows are read by position, because libsql returns plain tuples

@@ -111,8 +111,16 @@ def join_tournament(db_path, player, code):
         name: {"stock": 0, "price": details["reference_price"]}
         for name, details in PRODUCTS.items()
     }
-    db.join_tournament(db_path, tournament["id"], player, START_CASH, 0, products)
-    return tournament
+    seat = db.join_tournament(db_path, tournament["id"], player, START_CASH, 0, products)
+    return {**tournament, "seat": seat}
+
+
+def get_my_stands(db_path, player):
+    check_player(player)
+    stands = db.get_player_stands(db_path, player)
+    for stand in stands:
+        stand["products"] = db.get_stand_products(db_path, stand["id"], player)
+    return stands
 
 
 def load_game(db_path, player):
