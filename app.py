@@ -125,6 +125,22 @@ try:
 except db.DatabaseUnavailable as error:
     st.error(str(error))
     results = []
+
+# History charts: built only from this player's own saved results.
+chart_data = logic.profit_chart_data(results)
+if chart_data["Day"]:
+    st.write("Gross profit per day by product")
+    st.bar_chart(
+        chart_data, x="Day", y=list(logic.PRODUCTS), stack=False,
+        x_label="Day", y_label="Gross profit (€)",
+    )
+    st.write("Total gross profit per day")
+    st.line_chart(
+        chart_data, x="Day", y="Total", x_label="Day", y_label="Gross profit (€)",
+    )
+else:
+    st.info("Trade a day to see your charts.")
+
 for result in results:
     st.write(f"Day {result['day']}")
     rows = []

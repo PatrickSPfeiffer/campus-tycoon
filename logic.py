@@ -297,3 +297,22 @@ def build_run_report_csv(rows):
         ]
     )
     return output.getvalue()
+
+
+def profit_chart_data(results):
+    # Turns the saved history (logic.get_results) into data for the charts:
+    # one value per day for each product's gross profit, plus the day's total.
+    data = {"Day": []}
+    for name in PRODUCTS:
+        data[name] = []
+    data["Total"] = []
+    for result in sorted(results, key=lambda result: result["day"]):
+        data["Day"].append(result["day"])
+        total = 0.0
+        for name in PRODUCTS:
+            line = result["by_product"].get(name)
+            gross_profit = round(float(line["gross_profit"]), 2) if line else 0.0
+            data[name].append(gross_profit)
+            total = total + gross_profit
+        data["Total"].append(round(total, 2))
+    return data
