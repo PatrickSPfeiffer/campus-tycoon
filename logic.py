@@ -32,6 +32,50 @@ def check_product(product):
         raise ValueError(f"Unknown product: {product}.")
 
 
+def market_sales(product, stands, day):
+    """Return the number of units sold by each player for one product."""
+    check_product(product)
+    reference_price = PRODUCTS[product]["reference_price"]
+    sold = {}
+    for stand in stands:
+        sold[stand["player"]] = 0
+    if not stands:
+        return sold
+
+    # Rotate the joining order so the day's starting seat comes first.
+    by_seat = sorted(stands, key=lambda stand: stand["seat"])
+    start = (day - 1) % len(by_seat)
+    by_turn = by_seat[start:] + by_seat[:start]
+
+    stands_by_price = {}
+    for stand in by_turn:
+        price = stand["price"]
+        stands_by_price.setdefault(price, []).append(stand)
+    prices = sorted(stands_by_price)
+
+    # Each customer group starts at the cheapest price and resets the turn.
+    for price_limit in (reference_price, 2 * reference_price):
+        customers = 5 * len(stands)
+        for price in prices:
+            if price > price_limit or customers == 0:
+                break
+            tied_stands = stands_by_price[price]
+            while customers > 0:
+                sold_this_round = False
+                for stand in tied_stands:
+                    player = stand["player"]
+                    if sold[player] < stand["stock"]:
+                        sold[player] += 1
+                        customers -= 1
+                        sold_this_round = True
+                        if customers == 0:
+                            break
+                # Move to the next price once every stand here is empty.
+                if not sold_this_round:
+                    break
+    return sold
+
+
 def check_player(player):
     # The player is their email: non-empty text of at most 254 characters.
     if not isinstance(player, str) or player.strip() == "":
