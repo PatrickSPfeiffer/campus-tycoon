@@ -530,3 +530,47 @@ def test_tournament_units_sold_middle_price_band_sells_five():
     stands = {ANA: {"stock": {product: 20}, "price": {product: round(1.5 * reference, 2)}}}
 
     assert logic.tournament_units_sold(stands) == {ANA: {product: 5}}
+
+
+def test_tournament_status_lists_players_in_seat_order_with_ready_state(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path, (BRUNO, ANA))
+    logic.ready_tournament(db_path, ANA, tournament["id"])
+
+    status = logic.tournament_status(db_path, BRUNO, tournament["id"])
+
+    assert status["day"] == 1
+    assert status["organiser"] == ORGANISER
+    assert [(row["player"], row["seat"], row["ready"]) for row in status["players"]] == [
+        (BRUNO, 1, 0),
+        (ANA, 2, 1),
+    ]
+
+
+def test_tournament_status_is_visible_to_the_organiser_without_joining(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path, (ANA,))
+
+    status = logic.tournament_status(db_path, ORGANISER, tournament["id"])
+
+    assert [row["player"] for row in status["players"]] == [ANA]
+
+
+def test_tournament_status_refuses_outsider_without_changes(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path, (ANA,))
+    assert_refusal(
+        db_path,
+        lambda: logic.tournament_status(db_path, OUTSIDER, tournament["id"]),
+        "You have not joined this tournament.",
+    )
+
+
+def test_tournament_status_refuses_unknown_tournament_without_changes(tmp_path):
+    db_path = tmp_path / "game.db"
+    setup_tournament(db_path, (ANA,))
+    assert_refusal(
+        db_path,
+        lambda: logic.tournament_status(db_path, ANA, 9999),
+        "Tournament was not found.",
+    )

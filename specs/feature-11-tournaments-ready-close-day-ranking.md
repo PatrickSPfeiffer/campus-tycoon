@@ -11,6 +11,7 @@ After feature 10, players can create and join a tournament but cannot play it. T
 - Closing a day, in one transaction: one row per day, player and product is saved in tournament_results; each stand's cash and stock are updated; every stand becomes not Ready; tournaments.day increases by 1.
 - When day 5 closes, tournaments.day becomes 6 and the tournament is complete: no buying, pricing, Ready or closing is possible any more.
 - A completed tournament shows the final ranking, players ordered by overall gain = cash + leftover stock valued at unit_cost - 100, rounded to 2 decimals (the same rule as logic.final_result in the practice game). If two players have the same gain, the one with the lower seat comes first.
+- A member of the tournament, or its organiser, can see the list of players in seat order with their Ready state, also after the tournament is complete. Anyone else is refused. This is a read-only function in logic.py so that app.py never reads the database.
 - A player can only act on their own stand. Every refused action (unknown tournament, not a member, already Ready, completed tournament, non-organiser closing early, invalid quantity or price, not enough cash, ranking requested before the tournament is complete) shows a clear message and changes nothing in the database.
 - Rules in logic.py, reading and writing in db.py (using db.open_database), screens in app.py. No table is changed.
 
