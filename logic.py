@@ -125,6 +125,24 @@ def get_my_stands(db_path, player):
     return stands
 
 
+def tournament_status(db_path, player, tournament_id):
+    check_player(player)
+    tournament = db.get_tournament(db_path, tournament_id)
+    if tournament is None:
+        raise ValueError("Tournament was not found.")
+    stands = db.get_tournament_stands(db_path, tournament_id)
+    if player != tournament["organiser"] and player not in stands:
+        raise ValueError("You have not joined this tournament.")
+    return {
+        "day": tournament["day"],
+        "organiser": tournament["organiser"],
+        "players": [
+            {"player": stand["player"], "seat": stand["seat"], "ready": bool(stand["ready"])}
+            for stand in sorted(stands.values(), key=lambda item: item["seat"])
+        ],
+    }
+
+
 def load_game(db_path, player):
     check_player(player)
     game = db.get_game(db_path, player)
