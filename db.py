@@ -276,6 +276,121 @@ def join_tournament(db_path, tournament_id, player, cash, ready, products):
     return next_seat
 
 
+def get_tournament(db_path, tournament_id):
+    with open_database(db_path) as conn:
+        row = conn.execute(
+            "SELECT id, name, code, organiser, day FROM tournaments WHERE id = ?",
+            (tournament_id,),
+        ).fetchone()
+    if row is None:
+        return None
+    return {"id": row[0], "name": row[1], "code": row[2], "organiser": row[3], "day": row[4]}
+
+
+def get_tournament_stands(db_path, tournament_id):
+    with open_database(db_path) as conn:
+        rows = conn.execute(
+            "SELECT s.player, s.seat, s.cash, s.ready, p.product, p.stock, p.price "
+            "FROM stands AS s JOIN stand_products AS p "
+            "ON p.tournament_id = s.tournament_id AND p.player = s.player "
+            "WHERE s.tournament_id = ? ORDER BY s.seat, p.product",
+            (tournament_id,),
+        ).fetchall()
+    stands = {}
+    for row in rows:
+        player = row[0]
+        if player not in stands:
+            stands[player] = {
+                "player": player, "seat": row[1], "cash": float(row[2]), "ready": row[3],
+                "stock": {}, "price": {},
+            }
+        stands[player]["stock"][row[4]] = row[5]
+        stands[player]["price"][row[4]] = float(row[6])
+    return stands
+
+
+def set_tournament_stock(db_path, tournament_id, player, product, quantity, cash):
+    with open_database(db_path) as conn:
+        conn.execute(
+            "UPDATE stands SET cash = ? WHERE tournament_id = ? AND player = ?",
+            (cash, tournament_id, player),
+        )
+        conn.execute(
+            "UPDATE stand_products SET stock = stock + ? "
+            "WHERE tournament_id = ? AND player = ? AND product = ?",
+            (quantity, tournament_id, player, product),
+        )
+
+
+def set_tournament_price(db_path, tournament_id, player, product, price):
+    with open_database(db_path) as conn:
+        conn.execute(
+            "UPDATE stand_products SET price = ? "
+            "WHERE tournament_id = ? AND player = ? AND product = ?",
+            (price, tournament_id, player, product),
+        )
+
+
+def set_tournament_ready(db_path, tournament_id, player):
+    with open_database(db_path) as conn:
+        conn.execute(
+            "UPDATE stands SET ready = 1 WHERE tournament_id = ? AND player = ?",
+            (tournament_id, player),
+        )
+        count = conn.execute(
+            "SELECT COUNT(*) FROM stands WHERE tournament_id = ? AND ready = 0",
+            (tournament_id,),
+        ).fetchone()[0]
+    return count == 0
+
+
+def close_tournament_day(db_path, tournament_id, day, stands, by_player):
+    result = {"day": day, "by_player": by_player}
+    with open_database(db_path) as conn:
+        for player, stand in stands.items():
+            total_revenue = 0.0
+            for product, line in by_player[player].items():
+                units = line["units_sold"]
+                price = stand["price"][product]
+                total_revenue = round(total_revenue + line["revenue"], 2)
+                conn.execute(
+                    "INSERT INTO tournament_results "
+                    "(tournament_id, day, player, product, price, units_sold, revenue, cogs, gross_profit) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (tournament_id, day, player, product, price, units, line["revenue"],
+                     line["cogs"], line["gross_profit"]),
+                )
+                conn.execute(
+                    "UPDATE stand_products SET stock = stock - ? "
+                    "WHERE tournament_id = ? AND player = ? AND product = ?",
+                    (units, tournament_id, player, product),
+                )
+            conn.execute(
+                "UPDATE stands SET cash = ?, ready = 0 WHERE tournament_id = ? AND player = ?",
+                (round(stand["cash"] + total_revenue, 2), tournament_id, player),
+            )
+        conn.execute("UPDATE tournaments SET day = ? WHERE id = ?", (day + 1, tournament_id))
+    return result
+
+
+def get_tournament_ranking_rows(db_path, tournament_id):
+    with open_database(db_path) as conn:
+        rows = conn.execute(
+            "SELECT s.player, s.seat, s.cash, p.product, p.stock "
+            "FROM stands AS s JOIN stand_products AS p "
+            "ON p.tournament_id = s.tournament_id AND p.player = s.player "
+            "WHERE s.tournament_id = ? ORDER BY s.seat, p.product",
+            (tournament_id,),
+        ).fetchall()
+    ranking = {}
+    for row in rows:
+        player = row[0]
+        if player not in ranking:
+            ranking[player] = {"player": player, "seat": row[1], "cash": float(row[2]), "stock": {}}
+        ranking[player]["stock"][row[3]] = row[4]
+    return list(ranking.values())
+
+
 # Rows are read by position, because libsql returns plain tuples
 # where sqlite3 could return rows with names.
 # Every practice function takes the player (their email) and only

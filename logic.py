@@ -125,6 +125,24 @@ def get_my_stands(db_path, player):
     return stands
 
 
+def tournament_status(db_path, player, tournament_id):
+    check_player(player)
+    tournament = db.get_tournament(db_path, tournament_id)
+    if tournament is None:
+        raise ValueError("Tournament was not found.")
+    stands = db.get_tournament_stands(db_path, tournament_id)
+    if player != tournament["organiser"] and player not in stands:
+        raise ValueError("You have not joined this tournament.")
+    return {
+        "day": tournament["day"],
+        "organiser": tournament["organiser"],
+        "players": [
+            {"player": stand["player"], "seat": stand["seat"], "ready": bool(stand["ready"])}
+            for stand in sorted(stands.values(), key=lambda item: item["seat"])
+        ],
+    }
+
+
 def load_game(db_path, player):
     check_player(player)
     game = db.get_game(db_path, player)
@@ -254,6 +272,136 @@ def get_results(db_path, player):
     for result in results:
         result["total"] = total_of(result["by_product"])
     return results
+
+
+def tournament_units_sold(stands):
+    """Apply the current per-stand demand rule to each stand's stock and prices."""
+    sold = {}
+    for player, stand in stands.items():
+        sold[player] = {}
+        for product in stand["stock"]:
+            units = min(
+                demand(stand["price"][product], PRODUCTS[product]["reference_price"]),
+                stand["stock"][product],
+            )
+            sold[player][product] = units
+    return sold
+
+
+def _tournament_for_action(db_path, tournament_id, action):
+    tournament = db.get_tournament(db_path, tournament_id)
+    if tournament is None:
+        raise ValueError("Tournament was not found.")
+    if action == "ranking":
+        if tournament["day"] != RUN_DAYS + 1:
+            raise ValueError("The tournament is not complete.")
+    elif tournament["day"] == RUN_DAYS + 1:
+        raise ValueError("The tournament is complete.")
+    return tournament
+
+
+def _tournament_stand_for_action(db_path, tournament_id, player):
+    stands = db.get_tournament_stands(db_path, tournament_id)
+    if player not in stands:
+        raise ValueError("You have not joined this tournament.")
+    return stands[player]
+
+
+def _check_tournament_quantity(quantity):
+    if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+        raise ValueError("Quantity must be a positive whole number.")
+
+
+def _check_tournament_price(price):
+    if isinstance(price, bool) or not isinstance(price, (int, float)):
+        raise ValueError("Price must be a number.")
+    if price <= 0:
+        raise ValueError("Price must be more than €0.")
+    if round(price, 2) != price:
+        raise ValueError("Price can have at most 2 decimals.")
+
+
+def buy_tournament_stock(db_path, player, tournament_id, product, quantity):
+    _tournament_for_action(db_path, tournament_id, "buy")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are Ready and cannot change decisions.")
+    check_product(product)
+    _check_tournament_quantity(quantity)
+    cost = buy_cost(product, quantity)
+    if cost > stand["cash"]:
+        raise ValueError(
+            f"Not enough cash: buying costs €{cost:.2f}, you have €{stand['cash']:.2f}."
+        )
+    cash = round(stand["cash"] - cost, 2)
+    db.set_tournament_stock(db_path, tournament_id, player, product, quantity, cash)
+    return {"cash": cash, "stock": stand["stock"][product] + quantity}
+
+
+def set_tournament_price(db_path, player, tournament_id, product, price):
+    _tournament_for_action(db_path, tournament_id, "price")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are Ready and cannot change decisions.")
+    check_product(product)
+    _check_tournament_price(price)
+    db.set_tournament_price(db_path, tournament_id, player, product, float(price))
+    return float(price)
+
+
+def ready_tournament(db_path, player, tournament_id):
+    _tournament_for_action(db_path, tournament_id, "ready")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are already Ready.")
+    all_ready = db.set_tournament_ready(db_path, tournament_id, player)
+    if not all_ready:
+        return {"closed_day": None}
+    return {"closed_day": _close_tournament_day(db_path, tournament_id)}
+
+
+def close_tournament_day(db_path, player, tournament_id):
+    tournament = _tournament_for_action(db_path, tournament_id, "close")
+    if player != tournament["organiser"]:
+        raise ValueError("Only the organiser can close the day early.")
+    stands = db.get_tournament_stands(db_path, tournament_id)
+    if not stands:
+        raise ValueError("A tournament with no players cannot be closed.")
+    return _close_tournament_day(db_path, tournament_id, stands=stands, day=tournament["day"])
+
+
+def _close_tournament_day(db_path, tournament_id, stands=None, day=None):
+    if stands is None:
+        stands = db.get_tournament_stands(db_path, tournament_id)
+    if day is None:
+        day = db.get_tournament(db_path, tournament_id)["day"]
+    sales = tournament_units_sold(stands)
+    by_player = {}
+    for player, stand in stands.items():
+        by_player[player] = {}
+        for product, units in sales[player].items():
+            revenue = round(units * stand["price"][product], 2)
+            cogs = round(units * PRODUCTS[product]["unit_cost"], 2)
+            by_player[player][product] = {
+                "units_sold": units,
+                "revenue": revenue,
+                "cogs": cogs,
+                "gross_profit": round(revenue - cogs, 2),
+            }
+    return db.close_tournament_day(db_path, tournament_id, day, stands, by_player)
+
+
+def tournament_ranking(db_path, tournament_id):
+    _tournament_for_action(db_path, tournament_id, "ranking")
+    ranking = []
+    for stand in db.get_tournament_ranking_rows(db_path, tournament_id):
+        result = final_result({"cash": stand["cash"], "stock": stand["stock"]})
+        ranking.append({
+            "player": stand["player"], "seat": stand["seat"],
+            "final_cash": result["final_cash"], "stock_at_cost": result["stock_at_cost"],
+            "gain": result["gain"],
+        })
+    return sorted(ranking, key=lambda row: (-row["gain"], row["seat"]))
 
 
 def build_run_report_csv(rows):
