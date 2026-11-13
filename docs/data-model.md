@@ -41,6 +41,7 @@ One row per player: their current practice run.
 | player | TEXT, PRIMARY KEY | The player (`players.email`). |
 | cash | REAL NOT NULL | Cash in euros. Starts at 100.00. |
 | day | INTEGER NOT NULL | Next day to trade, 1–5; 6 means the run is complete. |
+| start_cash | REAL NOT NULL DEFAULT 100.0 | Cash at the start of this run: its difficulty level (Easy 150.00, Normal 100.00, Hard 70.00). The final gain subtracts it. Added for difficulty levels, approved by the owner of the data structure. |
 
 ### products
 
