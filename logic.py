@@ -10,6 +10,9 @@ MAX_PLAYER_LENGTH = 254
 MAX_TOURNAMENT_NAME_LENGTH = 40
 JOIN_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
+# Practice difficulty levels: the starting cash of a run. Normal is today's game.
+DIFFICULTY_LEVELS = {"Easy": 150.0, "Normal": 100.0, "Hard": 70.0}
+
 # The catalogue: fixed unit cost and reference price per product.
 PRODUCTS = {
     "Café": {"unit_cost": 2.00, "reference_price": 4.00},
@@ -58,10 +61,26 @@ def player_name(player):
     return player.split("@")[0]
 
 
-def start_game():
-    # The state at the start of every run.
+def check_level(level):
+    if level not in DIFFICULTY_LEVELS:
+        raise ValueError(f"Unknown difficulty level: {level}.")
+
+
+def level_name(game):
+    # The level whose starting cash matches this run's; Normal if none matches.
+    for name, cash in DIFFICULTY_LEVELS.items():
+        if cash == game["start_cash"]:
+            return name
+    return "Normal"
+
+
+def start_game(level="Normal"):
+    # The state at the start of every run, with the level's starting cash.
+    check_level(level)
+    start_cash = DIFFICULTY_LEVELS[level]
     return {
-        "cash": START_CASH,
+        "cash": start_cash,
+        "start_cash": start_cash,
         "day": 1,
         "stock": {name: 0 for name in PRODUCTS},
         "price": {name: PRODUCTS[name]["reference_price"] for name in PRODUCTS},
@@ -171,15 +190,19 @@ def final_result(game):
     return {
         "final_cash": float(game["cash"]),
         "stock_at_cost": float(stock_at_cost),
-        "gain": round(game["cash"] + stock_at_cost - START_CASH, 2),
+        # The run's own starting cash (difficulty level). Tournament stands have no
+        # start_cash: they always start with €100 (START_CASH).
+        "gain": round(game["cash"] + stock_at_cost - game.get("start_cash", START_CASH), 2),
     }
 
 
-def new_run(db_path, player):
-    # Back to the start: €100, no stock, reference prices, day 1, empty history.
+def new_run(db_path, player, level="Normal"):
+    # Back to the start: the level's cash, no stock, reference prices, day 1, empty history.
+    # The level is checked first, so an unknown level changes nothing.
+    check_level(level)
     # Loading first makes sure the player is in players.
     load_game(db_path, player)
-    game = start_game()
+    game = start_game(level)
     db.reset_game(db_path, player, game)
     return game
 
