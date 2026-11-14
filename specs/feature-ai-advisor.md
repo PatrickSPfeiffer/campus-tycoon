@@ -1,5 +1,7 @@
 # Feature: AI business advisor (practice mode)
 
+Owner: Filippo Bortignon · Branch: `feature-ai-advisor`
+
 ## Why
 
 Players need a simple hint about pricing while learning the practice game. An optional AI
@@ -13,7 +15,7 @@ advisor can suggest prices and explain them, without giving anyone an advantage 
 - `advisor.py` is the only file that calls OpenRouter, like `db.py` is the only file that reads
   or writes the database.
 - `advisor.ask_openrouter(prompt, api_key)` uses Python's `urllib.request` only (no new library),
-  calls model `openrouter/free` with a 10-second timeout, and returns the reply text. An empty
+  calls model `openrouter/free` with a 20-second timeout, and returns the reply text. An empty
   key raises `ValueError` and sends nothing.
 - The secret is `OPENROUTER_API_KEY`. `app.py` reads it from `st.secrets`; the key is never written
   in code. Add the key with an empty value to `.streamlit/secrets.example.toml`.
@@ -30,6 +32,7 @@ advisor can suggest prices and explain them, without giving anyone an advantage 
 - Advice never changes the game.
 - app.py shows a table with product, price and reason, labelled **AI suggestion** or
   **Basic tip (AI not available)**. The advice is plain text, never Markdown.
+- The advisor is hidden when the practice run is complete.
 
 ## Out of scope
 
