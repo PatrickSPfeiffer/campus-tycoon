@@ -174,6 +174,161 @@ if run_complete:
 
 st.subheader("Tournaments")
 
+
+def show_closed_day(closed_day, player):
+    st.success(f"Day {closed_day['day']} closed.")
+    own_sales = closed_day.get("by_player", {}).get(player)
+    if own_sales is not None:
+        st.table(
+            [
+                {
+                    "Product": product,
+                    "Units sold": line["units_sold"],
+                    "Revenue": f"€{line['revenue']:.2f}",
+                }
+                for product, line in own_sales.items()
+            ]
+        )
+
+
+def show_tournament(stand, player):
+    st.subheader(f"{stand['name']} — join code {stand['code']}")
+    tournament_id = stand["id"]
+    try:
+        status = logic.tournament_status(DB_PATH, player, tournament_id)
+    except (ValueError, db.DatabaseUnavailable) as error:
+        st.error(str(error))
+        return
+
+    action_error = None
+    action_message = None
+    closed_day = None
+    products = list(logic.PRODUCTS)
+    own_player = next((row for row in status["players"] if row["player"] == player), None)
+    is_ready = bool(own_player and own_player["ready"])
+
+    if status["day"] <= logic.RUN_DAYS:
+        if not is_ready:
+            with st.form(f"tournament_buy_form_{tournament_id}"):
+                buy_product = st.selectbox(
+                    "Product", products, key=f"tournament_buy_product_{tournament_id}"
+                )
+                quantity = st.number_input(
+                    "Quantity", min_value=1, step=1, value=1,
+                    key=f"tournament_quantity_{tournament_id}",
+                )
+                buy_submitted = st.form_submit_button("Buy")
+            if buy_submitted:
+                try:
+                    logic.buy_tournament_stock(
+                        DB_PATH, player, tournament_id, buy_product, int(quantity)
+                    )
+                    action_message = "Stock purchased."
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    action_error = str(error)
+
+            with st.form(f"tournament_price_form_{tournament_id}"):
+                price_product = st.selectbox(
+                    "Product", products, key=f"tournament_price_product_{tournament_id}"
+                )
+                price = st.number_input(
+                    "Price (€)", min_value=0.01, step=0.01, value=1.0, format="%.2f",
+                    key=f"tournament_price_{tournament_id}",
+                )
+                price_submitted = st.form_submit_button("Set price")
+            if price_submitted:
+                try:
+                    logic.set_tournament_price(
+                        DB_PATH, player, tournament_id, price_product, round(float(price), 2)
+                    )
+                    action_message = "Price updated."
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    action_error = str(error)
+
+            if st.button("Ready", key=f"tournament_ready_{tournament_id}"):
+                try:
+                    result = logic.ready_tournament(DB_PATH, player, tournament_id)
+                    action_message = "You are Ready."
+                    closed_day = result.get("closed_day")
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    action_error = str(error)
+
+        if player == status["organiser"] and st.button(
+            "Close day now", key=f"tournament_close_{tournament_id}"
+        ):
+            try:
+                closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
+            except (ValueError, db.DatabaseUnavailable) as error:
+                action_error = str(error)
+
+    if action_error:
+        st.error(action_error)
+    if action_message:
+        st.success(action_message)
+    if closed_day:
+        show_closed_day(closed_day, player)
+
+    # Reload after actions so the displayed state reflects this run's changes.
+    try:
+        status = logic.tournament_status(DB_PATH, player, tournament_id)
+        stands = logic.get_my_stands(DB_PATH, player)
+    except (ValueError, db.DatabaseUnavailable) as error:
+        st.error(str(error))
+        return
+    own_player = next((row for row in status["players"] if row["player"] == player), None)
+    current_stand = next((item for item in stands if item["id"] == tournament_id), None)
+    if current_stand is None:
+        return
+
+    if status["day"] == logic.RUN_DAYS + 1:
+        st.write("Tournament complete")
+        try:
+            ranking = logic.tournament_ranking(DB_PATH, tournament_id)
+            st.table(
+                [
+                    {
+                        "Position": position,
+                        "Player": logic.player_name(row["player"]),
+                        "Gain": f"€{row['gain']:.2f}",
+                        "Final cash": f"€{row['final_cash']:.2f}",
+                        "Stock at cost": f"€{row['stock_at_cost']:.2f}",
+                    }
+                    for position, row in enumerate(ranking, start=1)
+                ]
+            )
+        except (ValueError, db.DatabaseUnavailable) as error:
+            st.error(str(error))
+        st.write("Players")
+        st.table(
+            [
+                {"Player": logic.player_name(row["player"]), "Ready": "Ready" if row["ready"] else "not ready"}
+                for row in status["players"]
+            ]
+        )
+        return
+
+    st.write(f"Day {status['day']} of {logic.RUN_DAYS}")
+    st.write(f"Cash: €{current_stand['cash']:.2f}")
+    st.table(
+        [
+            {
+                "Product": product["product"],
+                "Stock": product["stock"],
+                "Price": f"€{product['price']:.2f}",
+            }
+            for product in current_stand["products"]
+        ]
+    )
+    st.write("Players")
+    st.table(
+        [
+            {"Player": logic.player_name(row["player"]), "Ready": "Ready" if row["ready"] else "not ready"}
+            for row in status["players"]
+        ]
+    )
+    if own_player and own_player["ready"]:
+        st.info("You are Ready. Waiting for the other players.")
+
 st.write("Create a tournament")
 tournament_name = st.text_input("Tournament name", key="tournament_name")
 if st.button("Create tournament"):
@@ -207,22 +362,11 @@ if st.button("Join tournament"):
 
 try:
     my_stands = logic.get_my_stands(DB_PATH, PLAYER)
-except db.DatabaseUnavailable as error:
+except (ValueError, db.DatabaseUnavailable) as error:
     st.error(str(error))
     my_stands = []
 
 if my_stands:
     st.write("My tournament stands")
     for stand in my_stands:
-        st.write(f"{stand['name']} — seat {stand['seat']}, day {stand['day']}")
-        st.write(f"Cash: €{stand['cash']:.2f}")
-        st.table(
-            [
-                {
-                    "Product": product["product"],
-                    "Stock": product["stock"],
-                    "Price": f"€{product['price']:.2f}",
-                }
-                for product in stand["products"]
-            ]
-        )
+        show_tournament(stand, PLAYER)
