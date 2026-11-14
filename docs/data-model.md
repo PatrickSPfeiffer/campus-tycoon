@@ -124,6 +124,18 @@ One row per stand and product: that stand's stock and selling price.
 
 PRIMARY KEY (tournament_id, player, product).
 
+### stand_upgrades
+
+One row per upgrade a stand has bought.
+
+| Column | Type | Meaning |
+|---|---|---|
+| tournament_id | INTEGER NOT NULL | `tournaments.id`. |
+| player | TEXT NOT NULL | The stand's player. |
+| upgrade | TEXT NOT NULL | Catalogue name, e.g. Coffee machine. |
+
+PRIMARY KEY (tournament_id, player, upgrade).
+
 ### tournament_results
 
 One row per closed day, player and product in a tournament.

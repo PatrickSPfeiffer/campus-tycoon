@@ -151,6 +151,13 @@ def create_tables(conn):
         " gross_profit REAL NOT NULL,"
         " PRIMARY KEY (tournament_id, day, player, product))"
     )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS stand_upgrades ("
+        " tournament_id INTEGER NOT NULL,"
+        " player TEXT NOT NULL,"
+        " upgrade TEXT NOT NULL,"
+        " PRIMARY KEY (tournament_id, player, upgrade))"
+    )
 
 
 @contextmanager
@@ -321,6 +328,29 @@ def set_tournament_stock(db_path, tournament_id, player, product, quantity, cash
             "WHERE tournament_id = ? AND player = ? AND product = ?",
             (quantity, tournament_id, player, product),
         )
+
+
+def add_tournament_upgrade(db_path, tournament_id, player, upgrade, cash):
+    with open_database(db_path) as conn:
+        conn.execute(
+            "UPDATE stands SET cash = ? WHERE tournament_id = ? AND player = ?",
+            (cash, tournament_id, player),
+        )
+        conn.execute(
+            "INSERT INTO stand_upgrades (tournament_id, player, upgrade) "
+            "VALUES (?, ?, ?)",
+            (tournament_id, player, upgrade),
+        )
+
+
+def get_tournament_upgrades(db_path, tournament_id, player):
+    with open_database(db_path) as conn:
+        rows = conn.execute(
+            "SELECT upgrade FROM stand_upgrades "
+            "WHERE tournament_id = ? AND player = ? ORDER BY upgrade",
+            (tournament_id, player),
+        ).fetchall()
+    return [row[0] for row in rows]
 
 
 def set_tournament_price(db_path, tournament_id, player, product, price):

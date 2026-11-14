@@ -27,6 +27,11 @@ PRODUCTS = {
     "Water": {"unit_cost": 0.50, "reference_price": 1.20},
 }
 
+# Tournament upgrades: one-time stand purchases.
+UPGRADES = {
+    "Coffee machine": {"product": "Café", "cost": 30.0, "reference_price": 5.0},
+}
+
 
 def demand(price, reference_price):
     # CT R1
@@ -381,6 +386,32 @@ def buy_tournament_stock(db_path, player, tournament_id, product, quantity):
     cash = round(stand["cash"] - cost, 2)
     db.set_tournament_stock(db_path, tournament_id, player, product, quantity, cash)
     return {"cash": cash, "stock": stand["stock"][product] + quantity}
+
+
+def buy_tournament_upgrade(db_path, player, tournament_id, upgrade):
+    _tournament_for_action(db_path, tournament_id, "buy")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are Ready and cannot change decisions.")
+    if upgrade not in UPGRADES:
+        raise ValueError("Unknown upgrade.")
+    if upgrade in db.get_tournament_upgrades(db_path, tournament_id, player):
+        raise ValueError("You already have this upgrade.")
+    cost = UPGRADES[upgrade]["cost"]
+    if cost > stand["cash"]:
+        raise ValueError(
+            f"Not enough cash: buying costs €{cost:.2f}, you have €{stand['cash']:.2f}."
+        )
+    cash = round(stand["cash"] - cost, 2)
+    db.add_tournament_upgrade(db_path, tournament_id, player, upgrade, cash)
+    return cash
+
+
+def tournament_upgrades(db_path, player, tournament_id):
+    if db.get_tournament(db_path, tournament_id) is None:
+        raise ValueError("Tournament was not found.")
+    _tournament_stand_for_action(db_path, tournament_id, player)
+    return db.get_tournament_upgrades(db_path, tournament_id, player)
 
 
 def set_tournament_price(db_path, player, tournament_id, product, price):
