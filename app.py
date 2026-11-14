@@ -41,6 +41,7 @@ if run_complete:
     col2.metric("Progress", "Run complete")
 else:
     col2.metric("Progress", f"Day {game['day']} of {logic.RUN_DAYS}")
+st.caption(f"Level: {logic.level_name(game)} (started with €{game['start_cash']:.2f})")
 
 if run_complete:
     final = logic.final_result(game)
@@ -51,19 +52,26 @@ if run_complete:
     col3.metric("Overall gain or loss", f"€{final['gain']:.2f}")
 
 st.subheader("New run")
+new_level = st.selectbox(
+    "Difficulty",
+    list(logic.DIFFICULTY_LEVELS),
+    index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
+    format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
+    key="new_run_level",
+)
 if not st.session_state.get("confirm_new_run"):
     if st.button("Start a new run"):
         st.session_state["confirm_new_run"] = True
         st.rerun()
 else:
-    st.warning("Start a new run? The current run and its history will be lost.")
+    st.warning(f"Start a new {new_level} run? The current run and its history will be lost.")
     col1, col2 = st.columns(2)
     if col1.button("Yes, start a new run"):
         try:
-            logic.new_run(DB_PATH, PLAYER)
+            logic.new_run(DB_PATH, PLAYER, new_level)
             st.session_state["confirm_new_run"] = False
             st.rerun()
-        except db.DatabaseUnavailable as error:
+        except (ValueError, db.DatabaseUnavailable) as error:
             st.error(str(error))
     if col2.button("Cancel"):
         st.session_state["confirm_new_run"] = False

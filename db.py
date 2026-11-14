@@ -88,7 +88,8 @@ def create_tables(conn):
         "CREATE TABLE IF NOT EXISTS games ("
         " player TEXT PRIMARY KEY,"
         " cash REAL NOT NULL,"
-        " day INTEGER NOT NULL)"
+        " day INTEGER NOT NULL,"
+        " start_cash REAL NOT NULL DEFAULT 100.0)"
     )
     conn.execute(
         "CREATE TABLE IF NOT EXISTS products ("
@@ -398,7 +399,9 @@ def get_tournament_ranking_rows(db_path, tournament_id):
 
 def get_game(db_path, player):
     with open_database(db_path) as conn:
-        row = conn.execute("SELECT cash, day FROM games WHERE player = ?", (player,)).fetchone()
+        row = conn.execute(
+            "SELECT cash, day, start_cash FROM games WHERE player = ?", (player,)
+        ).fetchone()
         products = conn.execute(
             "SELECT product, stock, price FROM products WHERE player = ?", (player,)
         ).fetchall()
@@ -407,6 +410,7 @@ def get_game(db_path, player):
     return {
         "cash": float(row[0]),
         "day": row[1],
+        "start_cash": float(row[2]),
         "stock": {p[0]: p[1] for p in products},
         "price": {p[0]: float(p[2]) for p in products},
     }
@@ -414,8 +418,8 @@ def get_game(db_path, player):
 
 def write_game(conn, player, game):
     conn.execute(
-        "INSERT OR REPLACE INTO games (player, cash, day) VALUES (?, ?, ?)",
-        (player, game["cash"], game["day"]),
+        "INSERT OR REPLACE INTO games (player, cash, day, start_cash) VALUES (?, ?, ?, ?)",
+        (player, game["cash"], game["day"], game["start_cash"]),
     )
     for name in game["stock"]:
         conn.execute(
