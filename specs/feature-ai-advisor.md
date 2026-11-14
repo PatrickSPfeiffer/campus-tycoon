@@ -16,7 +16,7 @@ advisor can suggest prices and explain them, without giving anyone an advantage 
   calls model `openrouter/free` with a 10-second timeout, and returns the reply text. An empty
   key raises `ValueError` and sends nothing.
 - The secret is `OPENROUTER_API_KEY`. `app.py` reads it from `st.secrets`; the key is never written
-  in code. Add the key with an empty value to `.streamlit/secrets.example.toml` and `.env.example`.
+  in code. Add the key with an empty value to `.streamlit/secrets.example.toml`.
 - `logic.advisor_prompt(game)` contains the day, cash, stock, catalogue, and demand rule (10 / 5 /
   0), and asks for JSON only with a price and reason for Café, Croissant and Water.
 - `logic.check_advice(text)` accepts only valid JSON with exactly those three products, where every

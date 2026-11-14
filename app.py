@@ -1,5 +1,6 @@
 import streamlit as st
 
+import advisor
 import db
 import logic
 
@@ -50,6 +51,27 @@ if run_complete:
     col1.metric("Final cash", f"€{final['final_cash']:.2f}")
     col2.metric("Remaining stock at cost", f"€{final['stock_at_cost']:.2f}")
     col3.metric("Overall gain or loss", f"€{final['gain']:.2f}")
+
+if not run_complete:
+    st.subheader("AI business advisor")
+    if st.button("Ask the advisor"):
+        api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+        advice = logic.get_advice(
+            game,
+            lambda prompt: advisor.ask_openrouter(prompt, api_key),
+        )
+        label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
+        st.write(label)
+        st.table(
+            [
+                {
+                    "Product": product,
+                    "Price": f"€{line['price']:.2f}",
+                    "Reason": line["reason"],
+                }
+                for product, line in advice["prices"].items()
+            ]
+        )
 
 st.subheader("New run")
 new_level = st.selectbox(
