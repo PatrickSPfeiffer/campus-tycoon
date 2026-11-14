@@ -213,6 +213,21 @@ def final_result(game):
     }
 
 
+def result_email_message(player, final):
+    if not isinstance(player, str) or player.strip() == "":
+        raise ValueError("Player must be a non-empty text.")
+    body = "\n".join(
+        [
+            f"Hello {player},",
+            f"Final cash: €{final['final_cash']:.2f}",
+            f"Remaining stock at cost: €{final['stock_at_cost']:.2f}",
+            f"Overall gain or loss: €{final['gain']:.2f}",
+            "Thanks for playing Campus Tycoon!",
+        ]
+    )
+    return {"subject": "Your Campus Tycoon result", "body": body}
+
+
 def new_run(db_path, player, level="Normal"):
     # Back to the start: the level's cash, no stock, reference prices, day 1, empty history.
     # The level is checked first, so an unknown level changes nothing.
