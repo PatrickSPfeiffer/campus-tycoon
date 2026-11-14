@@ -9,10 +9,10 @@ When a practice run ends, the player should get an email with their final result
 3. In a new file `mailer.py` (the only file that talks to the email service), a plain function `send_result_email(player, final, smtp_factory=smtplib.SMTP_SSL)` builds the message with `logic.result_email_message` and `email.message.EmailMessage`, and sends it through smtp.gmail.com on port 465 with a 10 second timeout, logging in with the two secrets. It returns exactly one of these strings: "sent", "skipped" or "failed". It never raises an exception to its caller.
 4. The two secrets are `EMAIL_ADDRESS` (the team Gmail address, also used as the sender) and `EMAIL_APP_PASSWORD` (the Gmail app password). `mailer.py` reads them like `db.read_settings` does for the database: environment variables first, then `st.secrets`; a missing secrets file or a missing value is the empty string.
 5. If either secret is missing or empty, nothing is sent and the result is "skipped" (this is the normal case for teammates who do not have the secrets).
-6. If the connection, login or sending fails for any reason (smtplib.SMTPException, OSError including timeouts), the result is "failed". Error text, the password and the address are never shown to the player and never logged.
+6. If the connection, login or sending fails for any reason (smtplib.SMTPException, OSError including timeouts), the result is "failed". Error text, the password and the address are never shown to the player and never logged. An invalid player is checked first: it gives "failed" even when the secrets are missing.
 7. In `app.py`, in the "Trade one day" handler, after `logic.trade_day` succeeds, if the reloaded game is complete (`logic.is_run_complete`), the app calls `mailer.send_result_email` once, inside a spinner, and shows: success "Your result was emailed to <PLAYER>." for "sent"; info "Result email is not configured, so no email was sent." for "skipped"; warning "We could not send the email, but your result is saved." for "failed". Then the app continues exactly as before (`st.rerun()` shows the final result, so the message must be kept in `st.session_state` until the next screen is drawn). The run is saved before any email is attempted.
 8. No table or column is added or changed: the email is attempted once, at the moment the run ends, because `trade_day` refuses any action after the fifth day.
-9. `.streamlit/secrets.example.toml` and `.env.example` get the two new names with placeholder values only (never real values).
+9. `.streamlit/secrets.example.toml` gets the two new names with placeholder values only (never real values), above the [auth] header. `.env.example` is not changed: a security-pass test requires it to list only the two database names. The two email settings can still be given as environment variables.
 
 ## Out of scope
 - Tournaments (no email when a tournament ends).
@@ -25,5 +25,5 @@ When a practice run ends, the player should get an email with their final result
 - No test opens a real network connection or reads a real secret.
 - `uv run pytest` passes with all old tests unmodified.
 - Manual test: with no secrets set, a practice run ends normally and shows the "not configured" message; with a deliberately wrong fake setting the run still ends and shows the warning.
-- The diff touches only `logic.py`, `mailer.py`, `app.py`, `.streamlit/secrets.example.toml`, `.env.example`, `tests/test_email_result.py` and the spec; no secret file is committed.
+- The diff touches only `logic.py`, `mailer.py`, `app.py`, `.streamlit/secrets.example.toml`, `tests/test_email_result.py` and the spec; no secret file is committed.
 - The pull request passes the "Tests" check.

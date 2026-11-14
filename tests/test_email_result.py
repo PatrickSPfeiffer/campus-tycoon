@@ -240,21 +240,26 @@ def test_final_result_is_unchanged_by_the_email(tmp_path, monkeypatch):
     original_game = copy.deepcopy(game)
 
     outcomes = []
-    set_email_environment(monkeypatch)
     successful_uses = []
-    outcomes.append((factory_for(successful_uses), "sent"))
+    outcomes.append((lambda: set_email_environment(monkeypatch), factory_for(successful_uses), "sent"))
 
-    monkeypatch.delenv("EMAIL_ADDRESS", raising=False)
-    monkeypatch.delenv("EMAIL_APP_PASSWORD", raising=False)
-    outcomes.append((factory_for([]), "skipped"))
+    def clear_email_environment():
+        monkeypatch.delenv("EMAIL_ADDRESS", raising=False)
+        monkeypatch.delenv("EMAIL_APP_PASSWORD", raising=False)
 
-    set_email_environment(monkeypatch)
+    outcomes.append((clear_email_environment, factory_for([]), "skipped"))
+
     failed_uses = []
     outcomes.append(
-        (factory_for(failed_uses, ("send_message", smtplib.SMTPException("send failed"))), "failed")
+        (
+            lambda: set_email_environment(monkeypatch),
+            factory_for(failed_uses, ("send_message", smtplib.SMTPException("send failed"))),
+            "failed",
+        )
     )
 
-    for factory, expected_status in outcomes:
+    for prepare_environment, factory, expected_status in outcomes:
+        prepare_environment()
         assert mailer.send_result_email(PLAYER, final, factory) == expected_status
         loaded_game = logic.load_game(db_path, PLAYER)
         assert logic.final_result(loaded_game) == final
