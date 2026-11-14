@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import math
 import secrets
 
@@ -273,6 +274,79 @@ def check_price(price):
         raise ValueError("Price can have at most 2 decimals.")
     if price > MAX_PRICE:
         raise ValueError(f"Price can be at most €{MAX_PRICE:.2f}.")
+
+
+def advisor_prompt(game):
+    catalogue = {
+        product: {
+            "unit_cost": details["unit_cost"],
+            "reference_price": details["reference_price"],
+        }
+        for product, details in PRODUCTS.items()
+    }
+    return (
+        "You are advising a player in practice mode.\n"
+        f"Day: {game['day']}\n"
+        f"Cash: {game['cash']:.2f}\n"
+        f"Stock: {json.dumps(game['stock'], ensure_ascii=False)}\n"
+        f"Catalogue: {json.dumps(catalogue, ensure_ascii=False)}\n"
+        "Demand rule: 10 units at or below the reference price, 5 units above the "
+        "reference price up to twice the reference price, and 0 units above twice "
+        "the reference price.\n"
+        "Return JSON only, with exactly these products: Café, Croissant and Water. "
+        "Prices are numbers in euros with at most 2 decimals. Give one short sentence "
+        "per reason and no other text. Exact answer format example: "
+        '{"Café": {"price": 4.5, "reason": "short reason"}, '
+        '"Croissant": {"price": 3.0, "reason": "short reason"}, '
+        '"Water": {"price": 1.2, "reason": "short reason"}}'
+    )
+
+
+def check_advice(text):
+    if not isinstance(text, str):
+        raise ValueError("Advice must be text.")
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[len("```json"):].lstrip("\r\n")
+    elif text.startswith("```"):
+        text = text[3:].lstrip("\r\n")
+    if text.endswith("```"):
+        text = text[:-3].rstrip()
+    try:
+        advice = json.loads(text)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ValueError("Advice must be valid JSON.") from error
+    if not isinstance(advice, dict) or set(advice) != set(PRODUCTS):
+        raise ValueError("Advice must contain exactly the three products.")
+    for product in PRODUCTS:
+        line = advice[product]
+        if not isinstance(line, dict) or set(line) != {"price", "reason"}:
+            raise ValueError("Each product needs exactly a price and a reason.")
+        check_price(line["price"])
+        if not isinstance(line["reason"], str) or line["reason"].strip() == "":
+            raise ValueError("Each product needs a non-empty reason.")
+    return advice
+
+
+def fallback_advice():
+    return {
+        "source": "fallback",
+        "prices": {
+            product: {
+                "price": round(details["reference_price"] * 2, 2),
+                "reason": "Twice the reference price is a simple starting tip.",
+            }
+            for product, details in PRODUCTS.items()
+        },
+    }
+
+
+def get_advice(game, ask):
+    try:
+        advice = check_advice(ask(advisor_prompt(game)))
+    except Exception:
+        return fallback_advice()
+    return {"source": "ai", "prices": advice}
 
 
 def set_price(db_path, player, product, price):

@@ -1,5 +1,6 @@
 import streamlit as st
 
+import advisor
 import db
 import logic
 import mailer
@@ -58,6 +59,27 @@ if run_complete:
         st.info("Result email is not configured, so no email was sent.")
     elif email_status == "failed":
         st.warning("We could not send the email, but your result is saved.")
+
+if not run_complete:
+    st.subheader("AI business advisor")
+    if st.button("Ask the advisor"):
+        api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+        advice = logic.get_advice(
+            game,
+            lambda prompt: advisor.ask_openrouter(prompt, api_key),
+        )
+        label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
+        st.write(label)
+        st.table(
+            [
+                {
+                    "Product": product,
+                    "Price": f"€{line['price']:.2f}",
+                    "Reason": line["reason"],
+                }
+                for product, line in advice["prices"].items()
+            ]
+        )
 
 st.subheader("New run")
 new_level = st.selectbox(
