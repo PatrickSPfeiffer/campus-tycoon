@@ -1,5 +1,6 @@
 import csv
 import io
+import math
 import secrets
 
 import db
@@ -9,6 +10,12 @@ RUN_DAYS = 5
 MAX_PLAYER_LENGTH = 254
 MAX_TOURNAMENT_NAME_LENGTH = 40
 JOIN_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+JOIN_CODE_LENGTH = 6
+# Highest selling price a player can set (security pass S3).
+MAX_PRICE = 1000.0
+# Characters allowed in a tournament name besides letters, digits and spaces (S1).
+# Markdown and HTML symbols such as [ ] < > * _ ` # | / : are refused.
+NAME_SYMBOLS = "-'.!?&()"
 
 # Practice difficulty levels: the starting cash of a run. Normal is today's game.
 DIFFICULTY_LEVELS = {"Easy": 150.0, "Normal": 100.0, "Hard": 70.0}
@@ -95,17 +102,27 @@ def check_tournament_name(name):
         raise ValueError(
             f"Tournament name can have at most {MAX_TOURNAMENT_NAME_LENGTH} characters."
         )
+    # S1: no Markdown or HTML, which Streamlit would show as links or formatting.
+    for character in name:
+        if not (character.isalnum() or character == " " or character in NAME_SYMBOLS):
+            raise ValueError(
+                f"Tournament name can only use letters, numbers, spaces and {NAME_SYMBOLS}"
+            )
     return name
 
 
 def clean_join_code(code):
     if not isinstance(code, str):
         raise ValueError("Tournament code must be text.")
-    return code.strip().upper()
+    code = code.strip().upper()
+    # S2: the same format the app generates, checked before the database is read.
+    if len(code) != JOIN_CODE_LENGTH or any(c not in JOIN_CODE_ALPHABET for c in code):
+        raise ValueError(f"Tournament code must be {JOIN_CODE_LENGTH} letters or numbers.")
+    return code
 
 
 def generate_join_code():
-    return "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(6))
+    return "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(JOIN_CODE_LENGTH))
 
 
 def create_tournament(db_path, organiser, name):
@@ -228,15 +245,25 @@ def buy(db_path, player, product, quantity):
     return game
 
 
-def set_price(db_path, player, product, price):
-    check_player(player)
-    check_product(product)
+def check_price(price):
+    # Used for practice and tournament prices.
     if isinstance(price, bool) or not isinstance(price, (int, float)):
         raise ValueError("Price must be a number.")
+    if not math.isfinite(price):
+        # S3: inf and nan are floats too.
+        raise ValueError("Price must be a finite number.")
     if price <= 0:
         raise ValueError("Price must be more than €0.")
     if round(price, 2) != price:
         raise ValueError("Price can have at most 2 decimals.")
+    if price > MAX_PRICE:
+        raise ValueError(f"Price can be at most €{MAX_PRICE:.2f}.")
+
+
+def set_price(db_path, player, product, price):
+    check_player(player)
+    check_product(product)
+    check_price(price)
     game = load_game(db_path, player)
     game["price"][product] = float(price)
     db.save_game(db_path, player, game)
@@ -336,12 +363,7 @@ def _check_tournament_quantity(quantity):
 
 
 def _check_tournament_price(price):
-    if isinstance(price, bool) or not isinstance(price, (int, float)):
-        raise ValueError("Price must be a number.")
-    if price <= 0:
-        raise ValueError("Price must be more than €0.")
-    if round(price, 2) != price:
-        raise ValueError("Price can have at most 2 decimals.")
+    check_price(price)
 
 
 def buy_tournament_stock(db_path, player, tournament_id, product, quantity):
