@@ -190,8 +190,9 @@ def final_result(game):
     return {
         "final_cash": float(game["cash"]),
         "stock_at_cost": float(stock_at_cost),
-        # The run's own starting cash (difficulty level); €100 for Normal.
-        "gain": round(game["cash"] + stock_at_cost - game["start_cash"], 2),
+        # The run's own starting cash (difficulty level). Tournament stands have no
+        # start_cash: they always start with €100 (START_CASH).
+        "gain": round(game["cash"] + stock_at_cost - game.get("start_cash", START_CASH), 2),
     }
 
 
