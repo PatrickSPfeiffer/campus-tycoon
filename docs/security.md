@@ -45,7 +45,10 @@ SQL injection: every query uses `?` parameters; no query is built by joining tex
 - Only two libraries: `streamlit[auth]` and `libsql` (plus `pytest` for tests).
 - Exact versions are pinned in `uv.lock`; GitHub Actions installs them with `uv sync --locked`
   and runs all tests on every pull request.
-- To do: turn on Dependabot alerts (repository settings, admin only).
+- Dependabot alerts are on (turned on by Patrick, repository admin): 0 open alerts on 14 Nov 2026.
+- No automatic update pull requests (no `dependabot.yml`): an unplanned Streamlit or libsql
+  upgrade could break sign-in or the database before the demo. If an alert appears, we update
+  that one library by hand in a normal pull request, with the tests as proof.
 
 ## Known limits
 
