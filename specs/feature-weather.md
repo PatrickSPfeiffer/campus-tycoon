@@ -20,6 +20,12 @@ It is fair, because all players get the same weather.
   (approved by Patrick). In `db.py`: `get_tournament_weather` and `save_tournament_weather`.
 - `logic.tournament_weather(db_path, tournament_id, fetch)`: if today's weather is saved, return it.
   Otherwise call `fetch`; if it fails, use no effect. Save it and return it.
+- "Today" means the tournament's current `day` column.
+- `tournament_weather` reads the current tournament day itself; its signature stays unchanged.
+- If fetching fails, save `{"rain": False, "hot": False}` so the API is not called again that day.
+- `fetch` returns raw Open-Meteo JSON; `tournament_weather` calls `read_weather` on it.
+- Weather-adjusted reference prices are used only while calculating that day's sales; they are not saved.
+- No effect is represented by `{"rain": False, "hot": False}`.
 - At day close, the saved weather changes the reference price for every stand:
   rain → Café €5.00 (instead of €4.00), hot → Water €1.50 (instead of €1.20).
   It uses the `reference` option that `market_sales` already has. No saved weather → no effect.
