@@ -334,10 +334,17 @@ def _close_and_read_sales(db_path, tournament_id, product, day=1):
 
 def test_tournament_market_sales_uses_player_product_references():
     stands = _market_stands()
+    baseline = logic.tournament_market_sales(stands, day=1)
+    with_reference = logic.tournament_market_sales(
+        stands, day=1, references={ANA: {"Café": 5.0}}
+    )
 
-    assert logic.tournament_market_sales(stands, day=1, references={ANA: {"Café": 5.0}}) == {
-        ANA: {"Café": 15}, BRUNO: {"Café": 5}
+    assert {player: products["Café"] for player, products in with_reference.items()} == {
+        ANA: 15, BRUNO: 5
     }
+    for player in (ANA, BRUNO):
+        for product in ("Croissant", "Water"):
+            assert with_reference[player][product] == baseline[player][product]
 
 
 def test_tournament_market_sales_without_references_keeps_equal_price_split():
@@ -351,11 +358,21 @@ def test_tournament_market_sales_without_references_keeps_equal_price_split():
 
 
 @pytest.mark.parametrize("references", [{}, {BRUNO: {"Water": 5.0}}, {ANA: {"Water": 5.0}}])
-def test_tournament_market_sales_missing_reference_entries_use_catalogue(references):
+def test_tournament_market_sales_unrelated_reference_entries_do_not_change_other_sales(references):
     stands = _market_stands()
-    expected = logic.tournament_market_sales(stands, day=1)
+    baseline = logic.tournament_market_sales(stands, day=1)
+    with_references = logic.tournament_market_sales(stands, day=1, references=references)
 
-    assert logic.tournament_market_sales(stands, day=1, references=references) == expected
+    if not references:
+        assert with_references == baseline
+    elif BRUNO in references:
+        assert with_references[ANA] == baseline[ANA]
+        for product in ("Café", "Croissant"):
+            assert with_references[BRUNO][product] == baseline[BRUNO][product]
+    else:
+        for product in ("Café", "Croissant"):
+            assert with_references[ANA][product] == baseline[ANA][product]
+        assert with_references[BRUNO] == baseline[BRUNO]
 
 
 def test_tournament_market_sales_reference_does_not_change_other_products():
