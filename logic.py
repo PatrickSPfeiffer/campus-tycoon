@@ -28,6 +28,11 @@ PRODUCTS = {
     "Water": {"unit_cost": 0.50, "reference_price": 1.20},
 }
 
+# Tournament upgrades: one-time stand purchases.
+UPGRADES = {
+    "Coffee machine": {"product": "Café", "cost": 30.0, "reference_price": 5.0},
+}
+
 
 def demand(price, reference_price):
     # CT R1
@@ -524,7 +529,7 @@ def tournament_units_sold(stands):
     return sold
 
 
-def tournament_market_sales(stands, day, references=None):
+def tournament_market_sales(stands, day, references=None, upgrade_references=None):
     """Calculate shared-market sales for every player and product."""
     sold = {}
     for player in stands:
@@ -539,8 +544,18 @@ def tournament_market_sales(stands, day, references=None):
                 "price": stand["price"][product],
                 "stock": stand["stock"][product],
             })
-            if references and product in references:
-                product_stands[-1]["reference"] = references[product]
+            weather_reference = references.get(product) if references else None
+            upgrade_reference = (
+                upgrade_references.get(player, {}).get(product)
+                if upgrade_references
+                else None
+            )
+            if weather_reference is not None and upgrade_reference is not None:
+                product_stands[-1]["reference"] = max(weather_reference, upgrade_reference)
+            elif weather_reference is not None:
+                product_stands[-1]["reference"] = weather_reference
+            elif upgrade_reference is not None:
+                product_stands[-1]["reference"] = upgrade_reference
 
         # Store this product's sales under each player.
         for player, units in market_sales(product, product_stands, day).items():
@@ -593,6 +608,32 @@ def buy_tournament_stock(db_path, player, tournament_id, product, quantity):
     return {"cash": cash, "stock": stand["stock"][product] + quantity}
 
 
+def buy_tournament_upgrade(db_path, player, tournament_id, upgrade):
+    _tournament_for_action(db_path, tournament_id, "buy")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are Ready and cannot change decisions.")
+    if upgrade not in UPGRADES:
+        raise ValueError("Unknown upgrade.")
+    if upgrade in db.get_tournament_upgrades(db_path, tournament_id, player):
+        raise ValueError("You already have this upgrade.")
+    cost = UPGRADES[upgrade]["cost"]
+    if cost > stand["cash"]:
+        raise ValueError(
+            f"Not enough cash: buying costs €{cost:.2f}, you have €{stand['cash']:.2f}."
+        )
+    cash = round(stand["cash"] - cost, 2)
+    db.add_tournament_upgrade(db_path, tournament_id, player, upgrade, cash)
+    return cash
+
+
+def tournament_upgrades(db_path, player, tournament_id):
+    if db.get_tournament(db_path, tournament_id) is None:
+        raise ValueError("Tournament was not found.")
+    _tournament_stand_for_action(db_path, tournament_id, player)
+    return db.get_tournament_upgrades(db_path, tournament_id, player)
+
+
 def set_tournament_price(db_path, player, tournament_id, product, price):
     _tournament_for_action(db_path, tournament_id, "price")
     stand = _tournament_stand_for_action(db_path, tournament_id, player)
@@ -637,7 +678,14 @@ def _close_tournament_day(db_path, tournament_id, stands=None, day=None):
             references["Café"] = 5.00
         if weather["hot"]:
             references["Water"] = 1.50
-    sales = tournament_market_sales(stands, day, references)
+    upgrade_references = {}
+    for player in stands:
+        player_upgrades = db.get_tournament_upgrades(db_path, tournament_id, player)
+        upgrade_references[player] = {}
+        for upgrade in player_upgrades:
+            details = UPGRADES[upgrade]
+            upgrade_references[player][details["product"]] = details["reference_price"]
+    sales = tournament_market_sales(stands, day, references, upgrade_references)
     by_player = {}
     for player, stand in stands.items():
         by_player[player] = {}

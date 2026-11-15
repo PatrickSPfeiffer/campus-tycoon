@@ -57,6 +57,14 @@ Ana sells at €3.50 with 15 units; Bruno at €6.00 with 10 units.
 The 10 budget customers buy from Ana. The premium customers buy 5 more from Ana
 (her stock runs out), and the last 5 buy from Bruno. Result: Ana sells 15, Bruno 5.
 
+## Upgrades (tournaments only)
+
+- A player can buy an upgrade for their own stand on any day, before pressing Ready, until the tournament is complete. The practice game has no upgrades.
+- The Coffee machine costs €30.00 and raises the Café reference price of that stand from €4.00 to €5.00. It works the same day it is bought and for the rest of the tournament.
+- In the shared market, weather references apply to every stand for the affected product. For each stand and product, use the higher of the weather reference and any upgrade reference when both exist, the one that exists when only one exists, or the catalogue reference when neither exists. Budget customers can pay up to that reference and premium customers up to twice it. The Coffee machine changes only its owner’s Café reference; it does not affect Water.
+- Each upgrade can be bought once per stand. The purchase is refused if the player already has it, if they do not have enough cash, if the player already pressed Ready, or if the tournament is complete.
+- The price is paid from cash at once. An upgrade has no value at the end: the final gain stays final cash + leftover stock at cost − 100 (CT R4), so an upgrade pays off only if it brings more extra revenue than its price.
+
 ## What players see
 
 - During a tournament: their own cash, stock, prices and day; who is ready.
@@ -69,13 +77,14 @@ The 10 budget customers buy from Ana. The premium customers buy 5 more from Ana
 - A player can only act in tournaments they joined, and only on their own stand.
 - Only the organiser can close a day early.
 - Joining with a wrong code, or after the first day closed, is rejected.
+- A player cannot buy the same upgrade twice, or an upgrade without enough cash.
 - Actions after the tournament is complete are rejected; nothing changes.
 
 ## What the product must remember
 
 Players (from their Google account); practice runs; tournaments (name, code, organiser,
 current day, status); each player's stand in a tournament (cash, stock, prices, ready);
-every closed day's results per player and product. All of it must survive restarts and
+which upgrades each stand has bought; every closed day's results per player and product. All of it must survive restarts and
 be shared by all users of the deployed app.
 
 ## Delivery in layers (each layer is a complete, working product)

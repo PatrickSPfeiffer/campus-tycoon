@@ -299,6 +299,26 @@ def show_tournament(stand, player):
                 except (ValueError, db.DatabaseUnavailable) as error:
                     action_error = str(error)
 
+            st.write("Upgrades")
+            try:
+                owned = logic.tournament_upgrades(DB_PATH, player, tournament_id)
+                for name, details in logic.UPGRADES.items():
+                    if name in owned:
+                        st.write(f"{name}: Owned")
+                    elif st.button(
+                        f"Buy {name} (€{details['cost']:.2f})",
+                        key=f"tournament_upgrade_{tournament_id}_{name}",
+                    ):
+                        try:
+                            logic.buy_tournament_upgrade(
+                                DB_PATH, player, tournament_id, name
+                            )
+                            action_message = "Upgrade purchased."
+                        except (ValueError, db.DatabaseUnavailable) as error:
+                            action_error = str(error)
+            except (ValueError, db.DatabaseUnavailable) as error:
+                st.error(str(error))
+
             if st.button("Ready", key=f"tournament_ready_{tournament_id}"):
                 try:
                     result = logic.ready_tournament(DB_PATH, player, tournament_id)
