@@ -61,7 +61,7 @@ The 10 budget customers buy from Ana. The premium customers buy 5 more from Ana
 
 - A player can buy an upgrade for their own stand on any day, before pressing Ready, until the tournament is complete. The practice game has no upgrades.
 - The Coffee machine costs €30.00 and raises the Café reference price of that stand from €4.00 to €5.00. It works the same day it is bought and for the rest of the tournament.
-- In the shared market, budget customers can pay at most €5.00 and premium customers at most €10.00 for Café at that stand. Other stands and other products keep their own reference prices.
+- In the shared market, weather references apply to every stand for the affected product. For each stand and product, use the higher of the weather reference and any upgrade reference when both exist, the one that exists when only one exists, or the catalogue reference when neither exists. Budget customers can pay up to that reference and premium customers up to twice it. The Coffee machine changes only its owner’s Café reference; it does not affect Water.
 - Each upgrade can be bought once per stand. The purchase is refused if the player already has it, if they do not have enough cash, if the player already pressed Ready, or if the tournament is complete.
 - The price is paid from cash at once. An upgrade has no value at the end: the final gain stays final cash + leftover stock at cost − 100 (CT R4), so an upgrade pays off only if it brings more extra revenue than its price.
 
