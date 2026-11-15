@@ -476,6 +476,28 @@ def tournament_units_sold(stands):
     return sold
 
 
+def tournament_market_sales(stands, day):
+    """Calculate shared-market sales for every player and product."""
+    sold = {}
+    for player in stands:
+        sold[player] = {}
+
+    for product in PRODUCTS:
+        product_stands = []
+        for player, stand in stands.items():
+            product_stands.append({
+                "player": player,
+                "seat": stand["seat"],
+                "price": stand["price"][product],
+                "stock": stand["stock"][product],
+            })
+
+        # Store this product's sales under each player.
+        for player, units in market_sales(product, product_stands, day).items():
+            sold[player][product] = units
+    return sold
+
+
 def _tournament_for_action(db_path, tournament_id, action):
     tournament = db.get_tournament(db_path, tournament_id)
     if tournament is None:
@@ -558,7 +580,7 @@ def _close_tournament_day(db_path, tournament_id, stands=None, day=None):
         stands = db.get_tournament_stands(db_path, tournament_id)
     if day is None:
         day = db.get_tournament(db_path, tournament_id)["day"]
-    sales = tournament_units_sold(stands)
+    sales = tournament_market_sales(stands, day)
     by_player = {}
     for player, stand in stands.items():
         by_player[player] = {}
