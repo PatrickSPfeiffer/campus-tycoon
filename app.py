@@ -108,18 +108,23 @@ else:
         st.rerun()
 
 st.subheader("Products")
-st.table(
-    [
-        {
-            "Product": name,
-            "Stock": game["stock"][name],
-            "Price": f"€{game['price'][name]:.2f}",
-            "Unit cost": f"€{logic.PRODUCTS[name]['unit_cost']:.2f}",
-            "Reference price": f"€{logic.PRODUCTS[name]['reference_price']:.2f}",
-        }
-        for name in logic.PRODUCTS
-    ]
-)
+if not run_complete:
+    preview = logic.demand_preview(game)
+
+product_rows = []
+for name, details in logic.PRODUCTS.items():
+    row = {
+        "Product": name,
+        "Stock": game["stock"][name],
+        "Price": f"€{game['price'][name]:.2f}",
+        "Unit cost": f"€{details['unit_cost']:.2f}",
+        "Reference price": f"€{details['reference_price']:.2f}",
+    }
+    if not run_complete:
+        row["Demand at this price"] = preview[name]["demand"]
+        row["Will sell"] = preview[name]["will_sell"]
+    product_rows.append(row)
+st.table(product_rows)
 st.caption(
     "Demand per product per day: 10 units at or below its reference price, "
     "5 units up to twice the reference price, 0 units above that."

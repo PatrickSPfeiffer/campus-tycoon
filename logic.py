@@ -38,6 +38,22 @@ def demand(price, reference_price):
     return 0
 
 
+def demand_preview(game):
+    """Preview sales at the current prices and stock for each product."""
+    preview = {}
+    for product, details in PRODUCTS.items():
+        price = game["price"][product]
+        stock = game["stock"][product]
+        units_demanded = demand(price, details["reference_price"])
+        preview[product] = {
+            "price": price,
+            "demand": units_demanded,
+            "stock": stock,
+            "will_sell": min(units_demanded, stock),
+        }
+    return preview
+
+
 def check_product(product):
     if product not in PRODUCTS:
         raise ValueError(f"Unknown product: {product}.")
