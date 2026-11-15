@@ -39,6 +39,13 @@ first. To test as several players, use private windows with different Google acc
 
 Tests also run automatically on every pull request in GitHub Actions.
 
+## Security
+
+Secrets stay out of the repository and every input is validated in `logic.py`; see
+[`docs/security.md`](docs/security.md). Dependencies are pinned in `uv.lock`, and Dependabot
+alerts are turned on: **no known vulnerabilities** (0 open Dependabot alerts, checked on
+14 Nov 2026). New alerts are fixed by hand in a normal pull request.
+
 ## Project structure
 
 - `app.py`: the Streamlit screens

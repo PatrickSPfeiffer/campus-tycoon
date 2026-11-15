@@ -1,7 +1,9 @@
 import streamlit as st
 
+import advisor
 import db
 import logic
+import mailer
 
 DB_PATH = db.DEFAULT_PATH
 
@@ -41,6 +43,7 @@ if run_complete:
     col2.metric("Progress", "Run complete")
 else:
     col2.metric("Progress", f"Day {game['day']} of {logic.RUN_DAYS}")
+st.caption(f"Level: {logic.level_name(game)} (started with €{game['start_cash']:.2f})")
 
 if run_complete:
     final = logic.final_result(game)
@@ -49,21 +52,56 @@ if run_complete:
     col1.metric("Final cash", f"€{final['final_cash']:.2f}")
     col2.metric("Remaining stock at cost", f"€{final['stock_at_cost']:.2f}")
     col3.metric("Overall gain or loss", f"€{final['gain']:.2f}")
+    email_status = st.session_state.pop("email_status", None)
+    if email_status == "sent":
+        st.success(f"Your result was emailed to {PLAYER}.")
+    elif email_status == "skipped":
+        st.info("Result email is not configured, so no email was sent.")
+    elif email_status == "failed":
+        st.warning("We could not send the email, but your result is saved.")
+
+if not run_complete:
+    st.subheader("AI business advisor")
+    if st.button("Ask the advisor"):
+        api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+        advice = logic.get_advice(
+            game,
+            lambda prompt: advisor.ask_openrouter(prompt, api_key),
+        )
+        label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
+        st.write(label)
+        st.table(
+            [
+                {
+                    "Product": product,
+                    "Price": f"€{line['price']:.2f}",
+                    "Reason": line["reason"],
+                }
+                for product, line in advice["prices"].items()
+            ]
+        )
 
 st.subheader("New run")
+new_level = st.selectbox(
+    "Difficulty",
+    list(logic.DIFFICULTY_LEVELS),
+    index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
+    format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
+    key="new_run_level",
+)
 if not st.session_state.get("confirm_new_run"):
     if st.button("Start a new run"):
         st.session_state["confirm_new_run"] = True
         st.rerun()
 else:
-    st.warning("Start a new run? The current run and its history will be lost.")
+    st.warning(f"Start a new {new_level} run? The current run and its history will be lost.")
     col1, col2 = st.columns(2)
     if col1.button("Yes, start a new run"):
         try:
-            logic.new_run(DB_PATH, PLAYER)
+            logic.new_run(DB_PATH, PLAYER, new_level)
             st.session_state["confirm_new_run"] = False
             st.rerun()
-        except db.DatabaseUnavailable as error:
+        except (ValueError, db.DatabaseUnavailable) as error:
             st.error(str(error))
     if col2.button("Cancel"):
         st.session_state["confirm_new_run"] = False
@@ -115,6 +153,12 @@ st.subheader("Trade")
 if st.button("Trade one day", disabled=run_complete):
     try:
         logic.trade_day(DB_PATH, PLAYER)
+        game = logic.load_game(DB_PATH, PLAYER)
+        if logic.is_run_complete(game):
+            with st.spinner("Sending your result by email..."):
+                st.session_state["email_status"] = mailer.send_result_email(
+                    PLAYER, logic.final_result(game)
+                )
         st.rerun()
     except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
@@ -166,6 +210,161 @@ if run_complete:
 
 st.subheader("Tournaments")
 
+
+def show_closed_day(closed_day, player):
+    st.success(f"Day {closed_day['day']} closed.")
+    own_sales = closed_day.get("by_player", {}).get(player)
+    if own_sales is not None:
+        st.table(
+            [
+                {
+                    "Product": product,
+                    "Units sold": line["units_sold"],
+                    "Revenue": f"€{line['revenue']:.2f}",
+                }
+                for product, line in own_sales.items()
+            ]
+        )
+
+
+def show_tournament(stand, player):
+    st.subheader(f"{stand['name']} — join code {stand['code']}")
+    tournament_id = stand["id"]
+    try:
+        status = logic.tournament_status(DB_PATH, player, tournament_id)
+    except (ValueError, db.DatabaseUnavailable) as error:
+        st.error(str(error))
+        return
+
+    action_error = None
+    action_message = None
+    closed_day = None
+    products = list(logic.PRODUCTS)
+    own_player = next((row for row in status["players"] if row["player"] == player), None)
+    is_ready = bool(own_player and own_player["ready"])
+
+    if status["day"] <= logic.RUN_DAYS:
+        if not is_ready:
+            with st.form(f"tournament_buy_form_{tournament_id}"):
+                buy_product = st.selectbox(
+                    "Product", products, key=f"tournament_buy_product_{tournament_id}"
+                )
+                quantity = st.number_input(
+                    "Quantity", min_value=1, step=1, value=1,
+                    key=f"tournament_quantity_{tournament_id}",
+                )
+                buy_submitted = st.form_submit_button("Buy")
+            if buy_submitted:
+                try:
+                    logic.buy_tournament_stock(
+                        DB_PATH, player, tournament_id, buy_product, int(quantity)
+                    )
+                    action_message = "Stock purchased."
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    action_error = str(error)
+
+            with st.form(f"tournament_price_form_{tournament_id}"):
+                price_product = st.selectbox(
+                    "Product", products, key=f"tournament_price_product_{tournament_id}"
+                )
+                price = st.number_input(
+                    "Price (€)", min_value=0.01, step=0.01, value=1.0, format="%.2f",
+                    key=f"tournament_price_{tournament_id}",
+                )
+                price_submitted = st.form_submit_button("Set price")
+            if price_submitted:
+                try:
+                    logic.set_tournament_price(
+                        DB_PATH, player, tournament_id, price_product, round(float(price), 2)
+                    )
+                    action_message = "Price updated."
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    action_error = str(error)
+
+            if st.button("Ready", key=f"tournament_ready_{tournament_id}"):
+                try:
+                    result = logic.ready_tournament(DB_PATH, player, tournament_id)
+                    action_message = "You are Ready."
+                    closed_day = result.get("closed_day")
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    action_error = str(error)
+
+        if player == status["organiser"] and st.button(
+            "Close day now", key=f"tournament_close_{tournament_id}"
+        ):
+            try:
+                closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
+            except (ValueError, db.DatabaseUnavailable) as error:
+                action_error = str(error)
+
+    if action_error:
+        st.error(action_error)
+    if action_message:
+        st.success(action_message)
+    if closed_day:
+        show_closed_day(closed_day, player)
+
+    # Reload after actions so the displayed state reflects this run's changes.
+    try:
+        status = logic.tournament_status(DB_PATH, player, tournament_id)
+        stands = logic.get_my_stands(DB_PATH, player)
+    except (ValueError, db.DatabaseUnavailable) as error:
+        st.error(str(error))
+        return
+    own_player = next((row for row in status["players"] if row["player"] == player), None)
+    current_stand = next((item for item in stands if item["id"] == tournament_id), None)
+    if current_stand is None:
+        return
+
+    if status["day"] == logic.RUN_DAYS + 1:
+        st.write("Tournament complete")
+        try:
+            ranking = logic.tournament_ranking(DB_PATH, tournament_id)
+            st.table(
+                [
+                    {
+                        "Position": position,
+                        "Player": logic.player_name(row["player"]),
+                        "Gain": f"€{row['gain']:.2f}",
+                        "Final cash": f"€{row['final_cash']:.2f}",
+                        "Stock at cost": f"€{row['stock_at_cost']:.2f}",
+                    }
+                    for position, row in enumerate(ranking, start=1)
+                ]
+            )
+        except (ValueError, db.DatabaseUnavailable) as error:
+            st.error(str(error))
+        st.write("Players")
+        st.table(
+            [
+                {"Player": logic.player_name(row["player"]), "Ready": "Ready" if row["ready"] else "not ready"}
+                for row in status["players"]
+            ]
+        )
+        return
+
+    st.write(f"Day {status['day']} of {logic.RUN_DAYS}")
+    st.write(f"Cash: €{current_stand['cash']:.2f}")
+    st.table(
+        [
+            {
+                "Product": product["product"],
+                "Stock": product["stock"],
+                "Price": f"€{product['price']:.2f}",
+            }
+            for product in current_stand["products"]
+        ]
+    )
+    st.write("Players")
+    st.table(
+        [
+            {"Player": logic.player_name(row["player"]), "Ready": "Ready" if row["ready"] else "not ready"}
+            for row in status["players"]
+        ]
+    )
+    if own_player and own_player["ready"]:
+        st.info("You are Ready. Waiting for the other players.")
+
 st.write("Create a tournament")
 tournament_name = st.text_input("Tournament name", key="tournament_name")
 if st.button("Create tournament"):
@@ -199,22 +398,11 @@ if st.button("Join tournament"):
 
 try:
     my_stands = logic.get_my_stands(DB_PATH, PLAYER)
-except db.DatabaseUnavailable as error:
+except (ValueError, db.DatabaseUnavailable) as error:
     st.error(str(error))
     my_stands = []
 
 if my_stands:
     st.write("My tournament stands")
     for stand in my_stands:
-        st.write(f"{stand['name']} — seat {stand['seat']}, day {stand['day']}")
-        st.write(f"Cash: €{stand['cash']:.2f}")
-        st.table(
-            [
-                {
-                    "Product": product["product"],
-                    "Stock": product["stock"],
-                    "Price": f"€{product['price']:.2f}",
-                }
-                for product in stand["products"]
-            ]
-        )
+        show_tournament(stand, PLAYER)

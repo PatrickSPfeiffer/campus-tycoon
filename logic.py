@@ -1,5 +1,7 @@
 import csv
 import io
+import json
+import math
 import secrets
 
 import db
@@ -9,6 +11,15 @@ RUN_DAYS = 5
 MAX_PLAYER_LENGTH = 254
 MAX_TOURNAMENT_NAME_LENGTH = 40
 JOIN_CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+JOIN_CODE_LENGTH = 6
+# Highest selling price a player can set (security pass S3).
+MAX_PRICE = 1000.0
+# Characters allowed in a tournament name besides letters, digits and spaces (S1).
+# Markdown and HTML symbols such as [ ] < > * _ ` # | / : are refused.
+NAME_SYMBOLS = "-'.!?&()"
+
+# Practice difficulty levels: the starting cash of a run. Normal is today's game.
+DIFFICULTY_LEVELS = {"Easy": 150.0, "Normal": 100.0, "Hard": 70.0}
 
 # The catalogue: fixed unit cost and reference price per product.
 PRODUCTS = {
@@ -102,10 +113,26 @@ def player_name(player):
     return player.split("@")[0]
 
 
-def start_game():
-    # The state at the start of every run.
+def check_level(level):
+    if level not in DIFFICULTY_LEVELS:
+        raise ValueError(f"Unknown difficulty level: {level}.")
+
+
+def level_name(game):
+    # The level whose starting cash matches this run's; Normal if none matches.
+    for name, cash in DIFFICULTY_LEVELS.items():
+        if cash == game["start_cash"]:
+            return name
+    return "Normal"
+
+
+def start_game(level="Normal"):
+    # The state at the start of every run, with the level's starting cash.
+    check_level(level)
+    start_cash = DIFFICULTY_LEVELS[level]
     return {
-        "cash": START_CASH,
+        "cash": start_cash,
+        "start_cash": start_cash,
         "day": 1,
         "stock": {name: 0 for name in PRODUCTS},
         "price": {name: PRODUCTS[name]["reference_price"] for name in PRODUCTS},
@@ -120,17 +147,27 @@ def check_tournament_name(name):
         raise ValueError(
             f"Tournament name can have at most {MAX_TOURNAMENT_NAME_LENGTH} characters."
         )
+    # S1: no Markdown or HTML, which Streamlit would show as links or formatting.
+    for character in name:
+        if not (character.isalnum() or character == " " or character in NAME_SYMBOLS):
+            raise ValueError(
+                f"Tournament name can only use letters, numbers, spaces and {NAME_SYMBOLS}"
+            )
     return name
 
 
 def clean_join_code(code):
     if not isinstance(code, str):
         raise ValueError("Tournament code must be text.")
-    return code.strip().upper()
+    code = code.strip().upper()
+    # S2: the same format the app generates, checked before the database is read.
+    if len(code) != JOIN_CODE_LENGTH or any(c not in JOIN_CODE_ALPHABET for c in code):
+        raise ValueError(f"Tournament code must be {JOIN_CODE_LENGTH} letters or numbers.")
+    return code
 
 
 def generate_join_code():
-    return "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(6))
+    return "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(JOIN_CODE_LENGTH))
 
 
 def create_tournament(db_path, organiser, name):
@@ -169,6 +206,24 @@ def get_my_stands(db_path, player):
     return stands
 
 
+def tournament_status(db_path, player, tournament_id):
+    check_player(player)
+    tournament = db.get_tournament(db_path, tournament_id)
+    if tournament is None:
+        raise ValueError("Tournament was not found.")
+    stands = db.get_tournament_stands(db_path, tournament_id)
+    if player != tournament["organiser"] and player not in stands:
+        raise ValueError("You have not joined this tournament.")
+    return {
+        "day": tournament["day"],
+        "organiser": tournament["organiser"],
+        "players": [
+            {"player": stand["player"], "seat": stand["seat"], "ready": bool(stand["ready"])}
+            for stand in sorted(stands.values(), key=lambda item: item["seat"])
+        ],
+    }
+
+
 def load_game(db_path, player):
     check_player(player)
     game = db.get_game(db_path, player)
@@ -197,15 +252,34 @@ def final_result(game):
     return {
         "final_cash": float(game["cash"]),
         "stock_at_cost": float(stock_at_cost),
-        "gain": round(game["cash"] + stock_at_cost - START_CASH, 2),
+        # The run's own starting cash (difficulty level). Tournament stands have no
+        # start_cash: they always start with €100 (START_CASH).
+        "gain": round(game["cash"] + stock_at_cost - game.get("start_cash", START_CASH), 2),
     }
 
 
-def new_run(db_path, player):
-    # Back to the start: €100, no stock, reference prices, day 1, empty history.
+def result_email_message(player, final):
+    if not isinstance(player, str) or player.strip() == "":
+        raise ValueError("Player must be a non-empty text.")
+    body = "\n".join(
+        [
+            f"Hello {player},",
+            f"Final cash: €{final['final_cash']:.2f}",
+            f"Remaining stock at cost: €{final['stock_at_cost']:.2f}",
+            f"Overall gain or loss: €{final['gain']:.2f}",
+            "Thanks for playing Campus Tycoon!",
+        ]
+    )
+    return {"subject": "Your Campus Tycoon result", "body": body}
+
+
+def new_run(db_path, player, level="Normal"):
+    # Back to the start: the level's cash, no stock, reference prices, day 1, empty history.
+    # The level is checked first, so an unknown level changes nothing.
+    check_level(level)
     # Loading first makes sure the player is in players.
     load_game(db_path, player)
-    game = start_game()
+    game = start_game(level)
     db.reset_game(db_path, player, game)
     return game
 
@@ -231,15 +305,98 @@ def buy(db_path, player, product, quantity):
     return game
 
 
-def set_price(db_path, player, product, price):
-    check_player(player)
-    check_product(product)
+def check_price(price):
+    # Used for practice and tournament prices.
     if isinstance(price, bool) or not isinstance(price, (int, float)):
         raise ValueError("Price must be a number.")
+    if not math.isfinite(price):
+        # S3: inf and nan are floats too.
+        raise ValueError("Price must be a finite number.")
     if price <= 0:
         raise ValueError("Price must be more than €0.")
     if round(price, 2) != price:
         raise ValueError("Price can have at most 2 decimals.")
+    if price > MAX_PRICE:
+        raise ValueError(f"Price can be at most €{MAX_PRICE:.2f}.")
+
+
+def advisor_prompt(game):
+    catalogue = {
+        product: {
+            "unit_cost": details["unit_cost"],
+            "reference_price": details["reference_price"],
+        }
+        for product, details in PRODUCTS.items()
+    }
+    return (
+        "You are advising a player in practice mode.\n"
+        f"Day: {game['day']}\n"
+        f"Cash: {game['cash']:.2f}\n"
+        f"Stock: {json.dumps(game['stock'], ensure_ascii=False)}\n"
+        f"Catalogue: {json.dumps(catalogue, ensure_ascii=False)}\n"
+        "Demand rule: 10 units at or below the reference price, 5 units above the "
+        "reference price up to twice the reference price, and 0 units above twice "
+        "the reference price.\n"
+        "Return JSON only, with exactly these products: Café, Croissant and Water. "
+        "Prices are numbers in euros with at most 2 decimals. Give one short sentence "
+        "per reason and no other text. Exact answer format example: "
+        '{"Café": {"price": 4.5, "reason": "short reason"}, '
+        '"Croissant": {"price": 3.0, "reason": "short reason"}, '
+        '"Water": {"price": 1.2, "reason": "short reason"}}'
+    )
+
+
+def check_advice(text):
+    if not isinstance(text, str):
+        raise ValueError("Advice must be text.")
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[len("```json"):].lstrip("\r\n")
+    elif text.startswith("```"):
+        text = text[3:].lstrip("\r\n")
+    if text.endswith("```"):
+        text = text[:-3].rstrip()
+    try:
+        advice = json.loads(text)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ValueError("Advice must be valid JSON.") from error
+    if not isinstance(advice, dict) or set(advice) != set(PRODUCTS):
+        raise ValueError("Advice must contain exactly the three products.")
+    for product in PRODUCTS:
+        line = advice[product]
+        if not isinstance(line, dict) or set(line) != {"price", "reason"}:
+            raise ValueError("Each product needs exactly a price and a reason.")
+        check_price(line["price"])
+        if not isinstance(line["reason"], str) or line["reason"].strip() == "":
+            raise ValueError("Each product needs a non-empty reason.")
+    return advice
+
+
+def fallback_advice():
+    return {
+        "source": "fallback",
+        "prices": {
+            product: {
+                "price": round(details["reference_price"] * 2, 2),
+                "reason": "Twice the reference price is a simple starting tip.",
+            }
+            for product, details in PRODUCTS.items()
+        },
+    }
+
+
+def get_advice(game, ask):
+    try:
+        advice = check_advice(ask(advisor_prompt(game)))
+    except Exception:
+        return fallback_advice()
+    return {"source": "ai", "prices": advice}
+
+
+def set_price(db_path, player, product, price):
+    check_player(player)
+    check_product(product)
+    check_price(price)
     game = load_game(db_path, player)
     game["price"][product] = float(price)
     db.save_game(db_path, player, game)
@@ -298,6 +455,131 @@ def get_results(db_path, player):
     for result in results:
         result["total"] = total_of(result["by_product"])
     return results
+
+
+def tournament_units_sold(stands):
+    """Apply the current per-stand demand rule to each stand's stock and prices."""
+    sold = {}
+    for player, stand in stands.items():
+        sold[player] = {}
+        for product in stand["stock"]:
+            units = min(
+                demand(stand["price"][product], PRODUCTS[product]["reference_price"]),
+                stand["stock"][product],
+            )
+            sold[player][product] = units
+    return sold
+
+
+def _tournament_for_action(db_path, tournament_id, action):
+    tournament = db.get_tournament(db_path, tournament_id)
+    if tournament is None:
+        raise ValueError("Tournament was not found.")
+    if action == "ranking":
+        if tournament["day"] != RUN_DAYS + 1:
+            raise ValueError("The tournament is not complete.")
+    elif tournament["day"] == RUN_DAYS + 1:
+        raise ValueError("The tournament is complete.")
+    return tournament
+
+
+def _tournament_stand_for_action(db_path, tournament_id, player):
+    stands = db.get_tournament_stands(db_path, tournament_id)
+    if player not in stands:
+        raise ValueError("You have not joined this tournament.")
+    return stands[player]
+
+
+def _check_tournament_quantity(quantity):
+    if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
+        raise ValueError("Quantity must be a positive whole number.")
+
+
+def _check_tournament_price(price):
+    check_price(price)
+
+
+def buy_tournament_stock(db_path, player, tournament_id, product, quantity):
+    _tournament_for_action(db_path, tournament_id, "buy")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are Ready and cannot change decisions.")
+    check_product(product)
+    _check_tournament_quantity(quantity)
+    cost = buy_cost(product, quantity)
+    if cost > stand["cash"]:
+        raise ValueError(
+            f"Not enough cash: buying costs €{cost:.2f}, you have €{stand['cash']:.2f}."
+        )
+    cash = round(stand["cash"] - cost, 2)
+    db.set_tournament_stock(db_path, tournament_id, player, product, quantity, cash)
+    return {"cash": cash, "stock": stand["stock"][product] + quantity}
+
+
+def set_tournament_price(db_path, player, tournament_id, product, price):
+    _tournament_for_action(db_path, tournament_id, "price")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are Ready and cannot change decisions.")
+    check_product(product)
+    _check_tournament_price(price)
+    db.set_tournament_price(db_path, tournament_id, player, product, float(price))
+    return float(price)
+
+
+def ready_tournament(db_path, player, tournament_id):
+    _tournament_for_action(db_path, tournament_id, "ready")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are already Ready.")
+    all_ready = db.set_tournament_ready(db_path, tournament_id, player)
+    if not all_ready:
+        return {"closed_day": None}
+    return {"closed_day": _close_tournament_day(db_path, tournament_id)}
+
+
+def close_tournament_day(db_path, player, tournament_id):
+    tournament = _tournament_for_action(db_path, tournament_id, "close")
+    if player != tournament["organiser"]:
+        raise ValueError("Only the organiser can close the day early.")
+    stands = db.get_tournament_stands(db_path, tournament_id)
+    if not stands:
+        raise ValueError("A tournament with no players cannot be closed.")
+    return _close_tournament_day(db_path, tournament_id, stands=stands, day=tournament["day"])
+
+
+def _close_tournament_day(db_path, tournament_id, stands=None, day=None):
+    if stands is None:
+        stands = db.get_tournament_stands(db_path, tournament_id)
+    if day is None:
+        day = db.get_tournament(db_path, tournament_id)["day"]
+    sales = tournament_units_sold(stands)
+    by_player = {}
+    for player, stand in stands.items():
+        by_player[player] = {}
+        for product, units in sales[player].items():
+            revenue = round(units * stand["price"][product], 2)
+            cogs = round(units * PRODUCTS[product]["unit_cost"], 2)
+            by_player[player][product] = {
+                "units_sold": units,
+                "revenue": revenue,
+                "cogs": cogs,
+                "gross_profit": round(revenue - cogs, 2),
+            }
+    return db.close_tournament_day(db_path, tournament_id, day, stands, by_player)
+
+
+def tournament_ranking(db_path, tournament_id):
+    _tournament_for_action(db_path, tournament_id, "ranking")
+    ranking = []
+    for stand in db.get_tournament_ranking_rows(db_path, tournament_id):
+        result = final_result({"cash": stand["cash"], "stock": stand["stock"]})
+        ranking.append({
+            "player": stand["player"], "seat": stand["seat"],
+            "final_cash": result["final_cash"], "stock_at_cost": result["stock_at_cost"],
+            "gain": result["gain"],
+        })
+    return sorted(ranking, key=lambda row: (-row["gain"], row["seat"]))
 
 
 def build_run_report_csv(rows):

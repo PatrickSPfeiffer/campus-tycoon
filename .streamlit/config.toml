@@ -1,0 +1,6 @@
+# Streamlit settings shared by the laptop and the deployed app (no secrets here).
+
+[client]
+# Never show tracebacks (file paths, code) to players on the public app.
+# Errors still appear in the terminal / Streamlit Cloud logs for the team.
+showErrorDetails = "none"
