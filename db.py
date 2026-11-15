@@ -158,6 +158,14 @@ def create_tables(conn):
         " upgrade TEXT NOT NULL,"
         " PRIMARY KEY (tournament_id, player, upgrade))"
     )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS tournament_weather ("
+        " tournament_id INTEGER NOT NULL,"
+        " day INTEGER NOT NULL,"
+        " rain INTEGER NOT NULL CHECK (rain IN (0, 1)),"
+        " hot INTEGER NOT NULL CHECK (hot IN (0, 1)),"
+        " PRIMARY KEY (tournament_id, day))"
+    )
 
 
 @contextmanager
@@ -293,6 +301,27 @@ def get_tournament(db_path, tournament_id):
     if row is None:
         return None
     return {"id": row[0], "name": row[1], "code": row[2], "organiser": row[3], "day": row[4]}
+
+
+def get_tournament_weather(db_path, tournament_id, day):
+    with open_database(db_path) as conn:
+        row = conn.execute(
+            "SELECT rain, hot FROM tournament_weather "
+            "WHERE tournament_id = ? AND day = ?",
+            (tournament_id, day),
+        ).fetchone()
+    if row is None:
+        return None
+    return {"rain": bool(row[0]), "hot": bool(row[1])}
+
+
+def save_tournament_weather(db_path, tournament_id, day, weather):
+    with open_database(db_path) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO tournament_weather "
+            "(tournament_id, day, rain, hot) VALUES (?, ?, ?, ?)",
+            (tournament_id, day, int(weather["rain"]), int(weather["hot"])),
+        )
 
 
 def get_tournament_stands(db_path, tournament_id):

@@ -43,6 +43,38 @@ def demand(price, reference_price):
     return 0
 
 
+def read_weather(data):
+    try:
+        daily = data["daily"]
+        rain_value = daily["precipitation_sum"][0]
+        temperature = daily["temperature_2m_max"][0]
+        if isinstance(rain_value, bool) or not isinstance(rain_value, (int, float)):
+            raise ValueError
+        if isinstance(temperature, bool) or not isinstance(temperature, (int, float)):
+            raise ValueError
+        if not math.isfinite(rain_value) or not math.isfinite(temperature):
+            raise ValueError
+    except (KeyError, IndexError, TypeError, ValueError):
+        raise ValueError("Weather answer is invalid.") from None
+    return {"rain": rain_value >= 1.0, "hot": temperature >= 25}
+
+
+def tournament_weather(db_path, tournament_id, fetch):
+    tournament = db.get_tournament(db_path, tournament_id)
+    if tournament is None:
+        raise ValueError("Tournament was not found.")
+    day = tournament["day"]
+    saved = db.get_tournament_weather(db_path, tournament_id, day)
+    if saved is not None:
+        return saved
+    try:
+        current = read_weather(fetch())
+    except Exception:
+        current = {"rain": False, "hot": False}
+    db.save_tournament_weather(db_path, tournament_id, day, current)
+    return current
+
+
 def demand_preview(game):
     """Preview sales at the current prices and stock for each product."""
     preview = {}
@@ -512,8 +544,8 @@ def tournament_market_sales(stands, day, references=None):
                 "price": stand["price"][product],
                 "stock": stand["stock"][product],
             })
-            if references and product in references.get(player, {}):
-                product_stands[-1]["reference"] = references[player][product]
+            if references and product in references:
+                product_stands[-1]["reference"] = references[product]
 
         # Store this product's sales under each player.
         for player, units in market_sales(product, product_stands, day).items():
@@ -629,11 +661,13 @@ def _close_tournament_day(db_path, tournament_id, stands=None, day=None):
         stands = db.get_tournament_stands(db_path, tournament_id)
     if day is None:
         day = db.get_tournament(db_path, tournament_id)["day"]
+    weather = db.get_tournament_weather(db_path, tournament_id, day)
     references = {}
-    for player in stands:
-        for upgrade in db.get_tournament_upgrades(db_path, tournament_id, player):
-            details = UPGRADES[upgrade]
-            references.setdefault(player, {})[details["product"]] = details["reference_price"]
+    if weather:
+        if weather["rain"]:
+            references["Café"] = 5.00
+        if weather["hot"]:
+            references["Water"] = 1.50
     sales = tournament_market_sales(stands, day, references)
     by_player = {}
     for player, stand in stands.items():

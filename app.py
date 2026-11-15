@@ -4,6 +4,7 @@ import advisor
 import db
 import logic
 import mailer
+import weather
 
 DB_PATH = db.DEFAULT_PATH
 
@@ -235,6 +236,18 @@ def show_closed_day(closed_day, player):
 def show_tournament(stand, player):
     st.subheader(f"{stand['name']} — join code {stand['code']}")
     tournament_id = stand["id"]
+    try:
+        today_weather = logic.tournament_weather(DB_PATH, tournament_id, weather.fetch_lisbon_weather)
+        if today_weather["rain"]:
+            weather_name = "rain"
+        elif today_weather["hot"]:
+            weather_name = "hot"
+        else:
+            weather_name = "normal"
+        st.write(f"Today in Lisbon: {weather_name}")
+    except (ValueError, db.DatabaseUnavailable) as error:
+        st.error(str(error))
+        return
     try:
         status = logic.tournament_status(DB_PATH, player, tournament_id)
     except (ValueError, db.DatabaseUnavailable) as error:

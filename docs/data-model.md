@@ -154,6 +154,19 @@ One row per closed day, player and product in a tournament.
 
 PRIMARY KEY (tournament_id, day, player, product), so a day can't be recorded twice.
 
+### tournament_weather
+
+One row per tournament and day. The same weather is used by every player in that tournament day.
+
+| Column | Type | Meaning |
+|---|---|---|
+| tournament_id | INTEGER NOT NULL | `tournaments.id`. |
+| day | INTEGER NOT NULL | The tournament day. |
+| rain | INTEGER NOT NULL | 1 when precipitation is at least 1.0 mm; otherwise 0. |
+| hot | INTEGER NOT NULL | 1 when maximum temperature is at least 25 °C; otherwise 0. |
+
+PRIMARY KEY (tournament_id, day).
+
 ## Old databases
 
 The structure changed in feature 7, and old databases are not upgraded. Delete the local
