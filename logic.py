@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import math
 import secrets
 
@@ -45,6 +46,55 @@ def demand(price, reference_price):
 def check_product(product):
     if product not in PRODUCTS:
         raise ValueError(f"Unknown product: {product}.")
+
+
+def market_sales(product, stands, day):
+    """Return the number of units sold by each player for one product."""
+    check_product(product)
+    catalogue_reference = PRODUCTS[product]["reference_price"]
+    sold = {}
+    for stand in stands:
+        sold[stand["player"]] = 0
+    if not stands:
+        return sold
+
+    # Rotate the joining order so the day's starting seat comes first.
+    by_seat = sorted(stands, key=lambda stand: stand["seat"])
+    start = (day - 1) % len(by_seat)
+    by_turn = by_seat[start:] + by_seat[:start]
+
+    stands_by_price = {}
+    for stand in by_turn:
+        price = stand["price"]
+        stands_by_price.setdefault(price, []).append(stand)
+    prices = sorted(stands_by_price)
+
+    # Each customer group starts at the cheapest price and resets the turn.
+    for reference_multiplier in (1, 2):
+        customers = 5 * len(stands)
+        for price in prices:
+            if customers == 0:
+                break
+            # Equal prices can have different limits because of upgrades.
+            affordable_stands = []
+            for stand in stands_by_price[price]:
+                reference = stand.get("reference", catalogue_reference)
+                if price <= round(reference_multiplier * reference, 2):
+                    affordable_stands.append(stand)
+            while customers > 0:
+                sold_this_round = False
+                for stand in affordable_stands:
+                    player = stand["player"]
+                    if sold[player] < stand["stock"]:
+                        sold[player] += 1
+                        customers -= 1
+                        sold_this_round = True
+                        if customers == 0:
+                            break
+                # Move to the next price once every stand here is empty.
+                if not sold_this_round:
+                    break
+    return sold
 
 
 def check_player(player):
@@ -218,6 +268,21 @@ def final_result(game):
     }
 
 
+def result_email_message(player, final):
+    if not isinstance(player, str) or player.strip() == "":
+        raise ValueError("Player must be a non-empty text.")
+    body = "\n".join(
+        [
+            f"Hello {player},",
+            f"Final cash: €{final['final_cash']:.2f}",
+            f"Remaining stock at cost: €{final['stock_at_cost']:.2f}",
+            f"Overall gain or loss: €{final['gain']:.2f}",
+            "Thanks for playing Campus Tycoon!",
+        ]
+    )
+    return {"subject": "Your Campus Tycoon result", "body": body}
+
+
 def new_run(db_path, player, level="Normal"):
     # Back to the start: the level's cash, no stock, reference prices, day 1, empty history.
     # The level is checked first, so an unknown level changes nothing.
@@ -263,6 +328,79 @@ def check_price(price):
         raise ValueError("Price can have at most 2 decimals.")
     if price > MAX_PRICE:
         raise ValueError(f"Price can be at most €{MAX_PRICE:.2f}.")
+
+
+def advisor_prompt(game):
+    catalogue = {
+        product: {
+            "unit_cost": details["unit_cost"],
+            "reference_price": details["reference_price"],
+        }
+        for product, details in PRODUCTS.items()
+    }
+    return (
+        "You are advising a player in practice mode.\n"
+        f"Day: {game['day']}\n"
+        f"Cash: {game['cash']:.2f}\n"
+        f"Stock: {json.dumps(game['stock'], ensure_ascii=False)}\n"
+        f"Catalogue: {json.dumps(catalogue, ensure_ascii=False)}\n"
+        "Demand rule: 10 units at or below the reference price, 5 units above the "
+        "reference price up to twice the reference price, and 0 units above twice "
+        "the reference price.\n"
+        "Return JSON only, with exactly these products: Café, Croissant and Water. "
+        "Prices are numbers in euros with at most 2 decimals. Give one short sentence "
+        "per reason and no other text. Exact answer format example: "
+        '{"Café": {"price": 4.5, "reason": "short reason"}, '
+        '"Croissant": {"price": 3.0, "reason": "short reason"}, '
+        '"Water": {"price": 1.2, "reason": "short reason"}}'
+    )
+
+
+def check_advice(text):
+    if not isinstance(text, str):
+        raise ValueError("Advice must be text.")
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[len("```json"):].lstrip("\r\n")
+    elif text.startswith("```"):
+        text = text[3:].lstrip("\r\n")
+    if text.endswith("```"):
+        text = text[:-3].rstrip()
+    try:
+        advice = json.loads(text)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ValueError("Advice must be valid JSON.") from error
+    if not isinstance(advice, dict) or set(advice) != set(PRODUCTS):
+        raise ValueError("Advice must contain exactly the three products.")
+    for product in PRODUCTS:
+        line = advice[product]
+        if not isinstance(line, dict) or set(line) != {"price", "reason"}:
+            raise ValueError("Each product needs exactly a price and a reason.")
+        check_price(line["price"])
+        if not isinstance(line["reason"], str) or line["reason"].strip() == "":
+            raise ValueError("Each product needs a non-empty reason.")
+    return advice
+
+
+def fallback_advice():
+    return {
+        "source": "fallback",
+        "prices": {
+            product: {
+                "price": round(details["reference_price"] * 2, 2),
+                "reason": "Twice the reference price is a simple starting tip.",
+            }
+            for product, details in PRODUCTS.items()
+        },
+    }
+
+
+def get_advice(game, ask):
+    try:
+        advice = check_advice(ask(advisor_prompt(game)))
+    except Exception:
+        return fallback_advice()
+    return {"source": "ai", "prices": advice}
 
 
 def set_price(db_path, player, product, price):

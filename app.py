@@ -1,7 +1,9 @@
 import streamlit as st
 
+import advisor
 import db
 import logic
+import mailer
 
 DB_PATH = db.DEFAULT_PATH
 
@@ -50,6 +52,34 @@ if run_complete:
     col1.metric("Final cash", f"€{final['final_cash']:.2f}")
     col2.metric("Remaining stock at cost", f"€{final['stock_at_cost']:.2f}")
     col3.metric("Overall gain or loss", f"€{final['gain']:.2f}")
+    email_status = st.session_state.pop("email_status", None)
+    if email_status == "sent":
+        st.success(f"Your result was emailed to {PLAYER}.")
+    elif email_status == "skipped":
+        st.info("Result email is not configured, so no email was sent.")
+    elif email_status == "failed":
+        st.warning("We could not send the email, but your result is saved.")
+
+if not run_complete:
+    st.subheader("AI business advisor")
+    if st.button("Ask the advisor"):
+        api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+        advice = logic.get_advice(
+            game,
+            lambda prompt: advisor.ask_openrouter(prompt, api_key),
+        )
+        label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
+        st.write(label)
+        st.table(
+            [
+                {
+                    "Product": product,
+                    "Price": f"€{line['price']:.2f}",
+                    "Reason": line["reason"],
+                }
+                for product, line in advice["prices"].items()
+            ]
+        )
 
 st.subheader("New run")
 new_level = st.selectbox(
@@ -123,6 +153,12 @@ st.subheader("Trade")
 if st.button("Trade one day", disabled=run_complete):
     try:
         logic.trade_day(DB_PATH, PLAYER)
+        game = logic.load_game(DB_PATH, PLAYER)
+        if logic.is_run_complete(game):
+            with st.spinner("Sending your result by email..."):
+                st.session_state["email_status"] = mailer.send_result_email(
+                    PLAYER, logic.final_result(game)
+                )
         st.rerun()
     except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
