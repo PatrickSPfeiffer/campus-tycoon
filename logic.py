@@ -529,7 +529,7 @@ def tournament_units_sold(stands):
     return sold
 
 
-def tournament_market_sales(stands, day, references=None):
+def tournament_market_sales(stands, day, references=None, upgrade_references=None):
     """Calculate shared-market sales for every player and product."""
     sold = {}
     for player in stands:
@@ -544,8 +544,18 @@ def tournament_market_sales(stands, day, references=None):
                 "price": stand["price"][product],
                 "stock": stand["stock"][product],
             })
-            if references and product in references:
-                product_stands[-1]["reference"] = references[product]
+            weather_reference = references.get(product) if references else None
+            upgrade_reference = (
+                upgrade_references.get(player, {}).get(product)
+                if upgrade_references
+                else None
+            )
+            if weather_reference is not None and upgrade_reference is not None:
+                product_stands[-1]["reference"] = max(weather_reference, upgrade_reference)
+            elif weather_reference is not None:
+                product_stands[-1]["reference"] = weather_reference
+            elif upgrade_reference is not None:
+                product_stands[-1]["reference"] = upgrade_reference
 
         # Store this product's sales under each player.
         for player, units in market_sales(product, product_stands, day).items():
@@ -668,7 +678,14 @@ def _close_tournament_day(db_path, tournament_id, stands=None, day=None):
             references["Café"] = 5.00
         if weather["hot"]:
             references["Water"] = 1.50
-    sales = tournament_market_sales(stands, day, references)
+    upgrade_references = {}
+    for player in stands:
+        player_upgrades = db.get_tournament_upgrades(db_path, tournament_id, player)
+        upgrade_references[player] = {}
+        for upgrade in player_upgrades:
+            details = UPGRADES[upgrade]
+            upgrade_references[player][details["product"]] = details["reference_price"]
+    sales = tournament_market_sales(stands, day, references, upgrade_references)
     by_player = {}
     for player, stand in stands.items():
         by_player[player] = {}

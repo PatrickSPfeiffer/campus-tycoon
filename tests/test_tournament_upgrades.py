@@ -336,7 +336,7 @@ def test_tournament_market_sales_uses_player_product_references():
     stands = _market_stands()
     baseline = logic.tournament_market_sales(stands, day=1)
     with_reference = logic.tournament_market_sales(
-        stands, day=1, references={ANA: {"Café": 5.0}}
+        stands, day=1, upgrade_references={ANA: {"Café": 5.0}}
     )
 
     assert {player: products["Café"] for player, products in with_reference.items()} == {
@@ -357,15 +357,15 @@ def test_tournament_market_sales_without_references_keeps_equal_price_split():
     }
 
 
-@pytest.mark.parametrize("references", [{}, {BRUNO: {"Water": 5.0}}, {ANA: {"Water": 5.0}}])
-def test_tournament_market_sales_unrelated_reference_entries_do_not_change_other_sales(references):
+@pytest.mark.parametrize("upgrade_references", [{}, {BRUNO: {"Water": 5.0}}, {ANA: {"Water": 5.0}}])
+def test_tournament_market_sales_unrelated_reference_entries_do_not_change_other_sales(upgrade_references):
     stands = _market_stands()
     baseline = logic.tournament_market_sales(stands, day=1)
-    with_references = logic.tournament_market_sales(stands, day=1, references=references)
+    with_references = logic.tournament_market_sales(stands, day=1, upgrade_references=upgrade_references)
 
-    if not references:
+    if not upgrade_references:
         assert with_references == baseline
-    elif BRUNO in references:
+    elif BRUNO in upgrade_references:
         assert with_references[ANA] == baseline[ANA]
         for product in ("Café", "Croissant"):
             assert with_references[BRUNO][product] == baseline[BRUNO][product]
@@ -380,7 +380,7 @@ def test_tournament_market_sales_reference_does_not_change_other_products():
     baseline = logic.tournament_market_sales(stands, day=1)
 
     with_reference = logic.tournament_market_sales(
-        stands, day=1, references={ANA: {"Croissant": 5.0}}
+        stands, day=1, upgrade_references={ANA: {"Croissant": 5.0}}
     )
 
     assert with_reference[ANA]["Water"] == baseline[ANA]["Water"]
@@ -465,3 +465,90 @@ def test_tournament_units_sold_remains_per_stand_without_references():
     assert logic.tournament_units_sold(stands) == {
         ANA: {"Café": 10}, BRUNO: {"Café": 5}, OUTSIDER: {"Café": 0}
     }
+
+
+def test_tournament_market_sales_rain_reference_matches_upgrade_reference():
+    stands = _market_stands()
+
+    sales = logic.tournament_market_sales(
+        stands,
+        day=1,
+        references={"Café": 5.0},
+        upgrade_references={ANA: {"Café": 5.0}},
+    )
+
+    assert {player: products["Café"] for player, products in sales.items()} == {
+        ANA: 10, BRUNO: 10
+    }
+
+
+def test_tournament_market_sales_uses_higher_weather_reference():
+    stands = _market_stands()
+
+    sales = logic.tournament_market_sales(
+        stands,
+        day=1,
+        references={"Café": 6.0},
+        upgrade_references={ANA: {"Café": 5.0}},
+    )
+
+    assert {player: products["Café"] for player, products in sales.items()} == {
+        ANA: 10, BRUNO: 10
+    }
+
+
+def test_tournament_market_sales_uses_higher_upgrade_reference():
+    stands = _market_stands()
+
+    sales = logic.tournament_market_sales(
+        stands,
+        day=1,
+        references={"Café": 4.5},
+        upgrade_references={ANA: {"Café": 5.0}},
+    )
+
+    assert {player: products["Café"] for player, products in sales.items()} == {
+        ANA: 15, BRUNO: 5
+    }
+
+
+def test_close_day_with_stored_rainy_weather_sells_ten_each(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path)
+    for player in (ANA, BRUNO):
+        logic.buy_tournament_stock(db_path, player, tournament["id"], "Café", 20)
+        logic.set_tournament_price(db_path, player, tournament["id"], "Café", 5.0)
+    logic.buy_tournament_upgrade(db_path, ANA, tournament["id"], UPGRADE)
+    logic.tournament_weather(
+        db_path,
+        tournament["id"],
+        lambda: {"daily": {"precipitation_sum": [3.2], "temperature_2m_max": [18]}},
+    )
+    logic.ready_tournament(db_path, ANA, tournament["id"])
+    logic.ready_tournament(db_path, BRUNO, tournament["id"])
+
+    assert read_rows(
+        db_path,
+        "SELECT player, units_sold FROM tournament_results WHERE day = 1 AND product = 'Café' ORDER BY player",
+    ) == [(ANA, 10), (BRUNO, 10)]
+
+
+def test_close_day_with_stored_hot_weather_keeps_cafe_upgrade_sales(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path)
+    for player in (ANA, BRUNO):
+        logic.buy_tournament_stock(db_path, player, tournament["id"], "Café", 20)
+        logic.set_tournament_price(db_path, player, tournament["id"], "Café", 5.0)
+    logic.buy_tournament_upgrade(db_path, ANA, tournament["id"], UPGRADE)
+    logic.tournament_weather(
+        db_path,
+        tournament["id"],
+        lambda: {"daily": {"precipitation_sum": [0], "temperature_2m_max": [27]}},
+    )
+    logic.ready_tournament(db_path, ANA, tournament["id"])
+    logic.ready_tournament(db_path, BRUNO, tournament["id"])
+
+    assert read_rows(
+        db_path,
+        "SELECT player, units_sold FROM tournament_results WHERE day = 1 AND product = 'Café' ORDER BY player",
+    ) == [(ANA, 15), (BRUNO, 5)]
