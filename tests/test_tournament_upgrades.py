@@ -297,3 +297,154 @@ def test_tournament_upgrades_rejects_player_who_has_not_joined(tmp_path):
 
     with pytest.raises(ValueError, match=re.escape("You have not joined this tournament.")):
         logic.tournament_upgrades(db_path, OUTSIDER, tournament["id"])
+
+
+def _market_stands(products=("Café", "Croissant", "Water")):
+    return {
+        ANA: {
+            "seat": 1,
+            "stock": {product: 20 for product in products},
+            "price": {product: 5.0 for product in products},
+        },
+        BRUNO: {
+            "seat": 2,
+            "stock": {product: 20 for product in products},
+            "price": {product: 5.0 for product in products},
+        },
+    }
+
+
+def _set_stock_and_price(db_path, tournament_id, player, product, quantity, price):
+    with db.open_database(db_path) as conn:
+        conn.execute(
+            "UPDATE stand_products SET stock = ?, price = ? "
+            "WHERE tournament_id = ? AND player = ? AND product = ?",
+            (quantity, price, tournament_id, player, product),
+        )
+
+
+def _close_and_read_sales(db_path, tournament_id, product, day=1):
+    logic.close_tournament_day(db_path, ORGANISER, tournament_id)
+    return read_rows(
+        db_path,
+        "SELECT player, units_sold FROM tournament_results WHERE day = ? AND product = ? ORDER BY player",
+        (day, product),
+    )
+
+
+def test_tournament_market_sales_uses_player_product_references():
+    stands = _market_stands()
+
+    assert logic.tournament_market_sales(stands, day=1, references={ANA: {"Café": 5.0}}) == {
+        ANA: {"Café": 15}, BRUNO: {"Café": 5}
+    }
+
+
+def test_tournament_market_sales_without_references_keeps_equal_price_split():
+    stands = _market_stands()
+
+    sales = logic.tournament_market_sales(stands, day=1)
+
+    assert {player: products["Café"] for player, products in sales.items()} == {
+        ANA: 5, BRUNO: 5
+    }
+
+
+@pytest.mark.parametrize("references", [{}, {BRUNO: {"Water": 5.0}}, {ANA: {"Water": 5.0}}])
+def test_tournament_market_sales_missing_reference_entries_use_catalogue(references):
+    stands = _market_stands()
+    expected = logic.tournament_market_sales(stands, day=1)
+
+    assert logic.tournament_market_sales(stands, day=1, references=references) == expected
+
+
+def test_tournament_market_sales_reference_does_not_change_other_products():
+    stands = _market_stands()
+    baseline = logic.tournament_market_sales(stands, day=1)
+
+    with_reference = logic.tournament_market_sales(
+        stands, day=1, references={ANA: {"Croissant": 5.0}}
+    )
+
+    assert with_reference[ANA]["Water"] == baseline[ANA]["Water"]
+    assert with_reference[BRUNO] == baseline[BRUNO]
+
+
+def test_close_day_applies_coffee_machine_on_purchase_day(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path)
+    for player in (ANA, BRUNO):
+        logic.buy_tournament_stock(db_path, player, tournament["id"], "Café", 20)
+        logic.set_tournament_price(db_path, player, tournament["id"], "Café", 5.0)
+    logic.buy_tournament_upgrade(db_path, ANA, tournament["id"], UPGRADE)
+    logic.ready_tournament(db_path, ANA, tournament["id"])
+    logic.ready_tournament(db_path, BRUNO, tournament["id"])
+
+    assert read_rows(
+        db_path,
+        "SELECT player, units_sold FROM tournament_results WHERE day = 1 AND product = 'Café' ORDER BY player",
+    ) == [(ANA, 15), (BRUNO, 5)]
+
+
+def test_close_day_without_upgrade_keeps_equal_price_split(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path)
+    for player in (ANA, BRUNO):
+        logic.buy_tournament_stock(db_path, player, tournament["id"], "Café", 20)
+        logic.set_tournament_price(db_path, player, tournament["id"], "Café", 5.0)
+
+    assert _close_and_read_sales(db_path, tournament["id"], "Café") == [(ANA, 5), (BRUNO, 5)]
+
+
+def test_close_day_retains_upgrade_reference_on_following_day(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path)
+    for player in (ANA, BRUNO):
+        logic.buy_tournament_stock(db_path, player, tournament["id"], "Café", 20)
+        logic.set_tournament_price(db_path, player, tournament["id"], "Café", 5.0)
+    logic.buy_tournament_upgrade(db_path, ANA, tournament["id"], UPGRADE)
+    logic.close_tournament_day(db_path, ORGANISER, tournament["id"])
+    for player in (ANA, BRUNO):
+        _set_stock_and_price(db_path, tournament["id"], player, "Café", 20, 5.0)
+
+    assert _close_and_read_sales(db_path, tournament["id"], "Café", day=2) == [(ANA, 15), (BRUNO, 5)]
+
+
+def test_close_day_upgrade_affects_only_buyers_cafe_product(tmp_path):
+    db_path = tmp_path / "game.db"
+    tournament = setup_tournament(db_path)
+    for player in (ANA, BRUNO):
+        for product in ("Café", "Croissant", "Water"):
+            quantity = 20 if product == "Café" else 1
+            logic.buy_tournament_stock(db_path, player, tournament["id"], product, quantity)
+            logic.set_tournament_price(db_path, player, tournament["id"], product, 5.0)
+    logic.buy_tournament_upgrade(db_path, ANA, tournament["id"], UPGRADE)
+    logic.close_tournament_day(db_path, ORGANISER, tournament["id"])
+
+    for product in ("Croissant", "Water"):
+        reference = logic.PRODUCTS[product]["reference_price"]
+        expected = logic.market_sales(
+            product,
+            [
+                {"player": ANA, "seat": 1, "price": 5.0, "stock": 1, "reference": reference},
+                {"player": BRUNO, "seat": 2, "price": 5.0, "stock": 1, "reference": reference},
+            ],
+            day=1,
+        )
+        assert read_rows(
+            db_path,
+            "SELECT player, units_sold FROM tournament_results WHERE day = 1 AND product = ? ORDER BY player",
+            (product,),
+        ) == [(ANA, expected[ANA]), (BRUNO, expected[BRUNO])]
+
+
+def test_tournament_units_sold_remains_per_stand_without_references():
+    stands = {
+        ANA: {"stock": {"Café": 20}, "price": {"Café": 4.0}},
+        BRUNO: {"stock": {"Café": 5}, "price": {"Café": 4.0}},
+        OUTSIDER: {"stock": {"Café": 20}, "price": {"Café": 8.01}},
+    }
+
+    assert logic.tournament_units_sold(stands) == {
+        ANA: {"Café": 10}, BRUNO: {"Café": 5}, OUTSIDER: {"Café": 0}
+    }
