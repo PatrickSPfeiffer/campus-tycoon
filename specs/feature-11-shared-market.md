@@ -11,22 +11,24 @@ database and can be built and tested before the tournament screens exist.
       - `product`: a catalogue name (`Café`, `Croissant` or `Water`). An unknown product is rejected.
       - `stands`: a list with one entry per player in the tournament, each a dict
         `{"player": email, "seat": joining order 1, 2, 3…, "price": selling price, "stock": units}`.
+        Each stand may include an optional numeric `reference` for the product at that stand
+        (e.g. 5.00 with the Coffee machine upgrade). If omitted, use the catalogue reference price.
       - `day`: the day being closed, 1–5.
       - It returns a dict `{player: units_sold}` with every player in it (0 if they sold nothing).
       - It does not change the `stands` list it receives, and it never reads or writes the database.
-- [ ] **M1.** There are 10 customers per player: half *budget* (pay at most the reference
-      price), half *premium* (pay at most twice the reference price).
+- [ ] **M1.** There are 10 customers per player: half *budget* (pay at most the stand's own
+      reference price), half *premium* (pay at most twice that stand's reference price).
 - [ ] **M2.** Budget customers buy first, then premium customers. Each customer buys one unit
       from the cheapest stand they can afford that still has stock. A stand never sells more
       than its stock.
 - [ ] **M3.** Stands with the same price share those customers one at a time, in turn,
-      in joining order, skipping a stand that has run out of stock (so its customers go to the
-      other tied stands). The turn starts with the player whose turn it is that day:
+      in joining order, skipping stands that the current customers cannot afford or that
+      have run out of stock. The turn starts with the player whose turn it is that day:
       seat 1 on day 1, seat 2 on day 2, and so on, starting again after the last seat.
       If that player is not in the tie, the next tied player in joining order starts.
       Budget and premium customers each start again from the player whose turn it is.
 - [ ] With one player, the function gives exactly the practice rule: 10 units at or below
-      the reference price, 5 up to twice the reference price, 0 above (limited by stock).
+      the stand's reference price, 5 up to twice that price, 0 above (limited by stock).
 
 ## Out of scope
 Revenue, COGS, cash and saving results (M4: the tournament close-day feature does that with
@@ -48,3 +50,7 @@ or the tables, changing the practice game.
 6. An unknown product is rejected. The `stands` list is unchanged after the call.
 7. All old tests pass unchanged; all tests green with `uv run pytest`, on branch
    feature-11-shared-market, pushed, pull request reviewed by a teammate.
+8. One player, Café, reference 5.00, stock 20: price 5.00 sells 10, 10.00 sells 5,
+   10.01 sells 0.
+9. Café, day 1: A (seat 1) €5.00 with reference 5.00 and B (seat 2) €5.00 without
+   reference, both with 20 units → A 15, B 5.

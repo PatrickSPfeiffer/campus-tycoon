@@ -46,7 +46,7 @@ def check_product(product):
 def market_sales(product, stands, day):
     """Return the number of units sold by each player for one product."""
     check_product(product)
-    reference_price = PRODUCTS[product]["reference_price"]
+    catalogue_reference = PRODUCTS[product]["reference_price"]
     sold = {}
     for stand in stands:
         sold[stand["player"]] = 0
@@ -65,15 +65,20 @@ def market_sales(product, stands, day):
     prices = sorted(stands_by_price)
 
     # Each customer group starts at the cheapest price and resets the turn.
-    for price_limit in (reference_price, 2 * reference_price):
+    for reference_multiplier in (1, 2):
         customers = 5 * len(stands)
         for price in prices:
-            if price > price_limit or customers == 0:
+            if customers == 0:
                 break
-            tied_stands = stands_by_price[price]
+            # Equal prices can have different limits because of upgrades.
+            affordable_stands = []
+            for stand in stands_by_price[price]:
+                reference = stand.get("reference", catalogue_reference)
+                if price <= round(reference_multiplier * reference, 2):
+                    affordable_stands.append(stand)
             while customers > 0:
                 sold_this_round = False
-                for stand in tied_stands:
+                for stand in affordable_stands:
                     player = stand["player"]
                     if sold[player] < stand["stock"]:
                         sold[player] += 1

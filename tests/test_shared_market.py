@@ -72,3 +72,19 @@ def test_unknown_product_is_rejected_and_stands_are_unchanged():
         logic.market_sales("Unknown", stands, day=1)
 
     assert stands == original_stands
+
+
+def test_one_player_uses_upgraded_reference_price():
+    for price, sold in [(5.00, 10), (10.00, 5), (10.01, 0)]:
+        stands = [{"player": A, "seat": 1, "price": price, "stock": 20, "reference": 5.00}]
+
+        assert logic.market_sales("Café", stands, day=1) == {A: sold}
+
+
+def test_tied_stands_can_have_different_reference_prices():
+    stands = [
+        {"player": A, "seat": 1, "price": 5.00, "stock": 20, "reference": 5.00},
+        {"player": B, "seat": 2, "price": 5.00, "stock": 20},
+    ]
+
+    assert logic.market_sales("Café", stands, day=1) == {A: 15, B: 5}
