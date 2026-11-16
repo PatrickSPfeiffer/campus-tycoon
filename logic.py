@@ -21,6 +21,11 @@ NAME_SYMBOLS = "-'.!?&()"
 # Practice difficulty levels: the starting cash of a run. Normal is today's game.
 DIFFICULTY_LEVELS = {"Easy": 150.0, "Normal": 100.0, "Hard": 70.0}
 
+# Practice loans: one loan per run, a whole number of euros up to LOAN_MAX,
+# paid back with LOAN_INTEREST (10%) out of the final gain.
+LOAN_MAX = 50
+LOAN_INTEREST = 0.10
+
 # The catalogue: fixed unit cost and reference price per product.
 PRODUCTS = {
     "Café": {"unit_cost": 2.00, "reference_price": 4.00},
@@ -191,6 +196,7 @@ def start_game(level="Normal"):
     return {
         "cash": start_cash,
         "start_cash": start_cash,
+        "debt": 0.0,
         "day": 1,
         "stock": {name: 0 for name in PRODUCTS},
         "price": {name: PRODUCTS[name]["reference_price"] for name in PRODUCTS},
@@ -311,8 +317,14 @@ def final_result(game):
         "final_cash": float(game["cash"]),
         "stock_at_cost": float(stock_at_cost),
         # The run's own starting cash (difficulty level). Tournament stands have no
-        # start_cash: they always start with €100 (START_CASH).
-        "gain": round(game["cash"] + stock_at_cost - game.get("start_cash", START_CASH), 2),
+        # start_cash: they always start with €100 (START_CASH). A loan's debt is
+        # paid back out of the gain, so cash never goes negative (CT R3).
+        # Tournament stands have no loans.
+        "gain": round(
+            game["cash"] + stock_at_cost - game.get("start_cash", START_CASH)
+            - game.get("debt", 0.0),
+            2,
+        ),
     }
 
 
@@ -339,6 +351,29 @@ def new_run(db_path, player, level="Normal"):
     load_game(db_path, player)
     game = start_game(level)
     db.reset_game(db_path, player, game)
+    return game
+
+
+def loan_debt(amount):
+    # What the player will owe for a loan: the amount plus 10% interest.
+    return round(amount * (1 + LOAN_INTEREST), 2)
+
+
+def take_loan(db_path, player, amount):
+    check_player(player)
+    # True and False count as numbers in Python, so they are refused first.
+    if isinstance(amount, bool) or not isinstance(amount, int):
+        raise ValueError("The loan must be a whole number of euros.")
+    if amount < 1 or amount > LOAN_MAX:
+        raise ValueError(f"The loan must be between €1 and €{LOAN_MAX}.")
+    game = load_game(db_path, player)
+    check_run_not_complete(game)
+    if game["debt"] > 0:
+        raise ValueError("You already have a loan in this run.")
+    game["cash"] = round(game["cash"] + amount, 2)
+    game["debt"] = loan_debt(amount)
+    # Cash and debt are saved together, in one transaction.
+    db.save_game(db_path, player, game)
     return game
 
 

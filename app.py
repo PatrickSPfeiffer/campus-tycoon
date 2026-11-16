@@ -38,21 +38,23 @@ except db.DatabaseUnavailable as error:
     st.stop()
 run_complete = logic.is_run_complete(game)
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 col1.metric("Cash", f"€{game['cash']:.2f}")
 if run_complete:
     col2.metric("Progress", "Run complete")
 else:
     col2.metric("Progress", f"Day {game['day']} of {logic.RUN_DAYS}")
+col3.metric("Loan to repay", f"€{game['debt']:.2f}")
 st.caption(f"Level: {logic.level_name(game)} (started with €{game['start_cash']:.2f})")
 
 if run_complete:
     final = logic.final_result(game)
     st.subheader("Final result")
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("Final cash", f"€{final['final_cash']:.2f}")
     col2.metric("Remaining stock at cost", f"€{final['stock_at_cost']:.2f}")
-    col3.metric("Overall gain or loss", f"€{final['gain']:.2f}")
+    col3.metric("Loan to repay", f"€{game['debt']:.2f}")
+    col4.metric("Overall gain or loss", f"€{final['gain']:.2f}")
     email_status = st.session_state.pop("email_status", None)
     if email_status == "sent":
         st.success(f"Your result was emailed to {PLAYER}.")
@@ -140,6 +142,24 @@ new_price = st.number_input(
 if st.button("Set price"):
     try:
         logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
+        st.rerun()
+    except (ValueError, db.DatabaseUnavailable) as error:
+        st.error(str(error))
+
+st.subheader("Loan")
+st.caption(
+    f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
+    f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
+)
+has_loan = game["debt"] > 0
+loan_amount = st.number_input(
+    "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
+    key="loan_amount",
+)
+st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
+if st.button("Take loan", disabled=run_complete or has_loan):
+    try:
+        logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
         st.rerun()
     except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))

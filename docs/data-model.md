@@ -42,6 +42,7 @@ One row per player: their current practice run.
 | cash | REAL NOT NULL | Cash in euros. Starts at 100.00. |
 | day | INTEGER NOT NULL | Next day to trade, 1–5; 6 means the run is complete. |
 | start_cash | REAL NOT NULL DEFAULT 100.0 | Cash at the start of this run: its difficulty level (Easy 150.00, Normal 100.00, Hard 70.00). The final gain subtracts it. Added for difficulty levels, approved by the owner of the data structure. |
+| debt | REAL NOT NULL DEFAULT 0 | Euros owed for this run's loan (amount + 10% interest), 0.00 without a loan. The final gain subtracts it. Added for loans, approved by the owner of the data structure. |
 
 ### products
 
