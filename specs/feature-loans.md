@@ -16,8 +16,9 @@ pays off if the extra sales bring more than the interest. (Project list: "Loans"
       below 1 or above 50 (True/False are not numbers); the player already has a loan
       in this run ("You already have a loan in this run."); the run is complete (same
       message as buying after the run is complete).
-- [ ] Final result (CT R4 plus the loan): final_result also returns "debt", and
-      gain = final cash + stock at cost - starting cash - debt. Cash is never reduced
+- [ ] Final result (CT R4 plus the loan): gain = final cash + stock at cost -
+      starting cash - debt. final_result keeps its keys (the debt is read from the
+      game), so the existing tests stay unchanged. Cash is never reduced
       by the debt, so it never goes negative (CT R3). Tournament stands have no debt.
 - [ ] Screen (practice only): a "Loan" section with an amount from 1 to 50, the text
       "You will owe €X" before confirming, and a "Take loan" button, disabled when the
