@@ -12,7 +12,7 @@ Only the look and the screen layout change. The rules and the data do not change
 4. Practice tab: status numbers (Cash, Progress, Loan) in a bordered card; actions (price, loan, buy) in bordered cards side by side; products table next to or above them; "Trade one day" is the main button, full width, placed right after the actions. Results (charts and day tables) in their own area below; new run, advisor and report download grouped and clearly secondary.
 5. Tournaments tab: create and join side by side; each tournament in its own bordered card with weather, day, cash, stock and prices, upgrades, players and ready status, then Ready as the main button.
 6. Buttons: one main (primary) button per card; secondary buttons stay default; dangerous actions (new run, close day) ask for confirmation.
-7. Messages: success and error messages appear next to the button that caused them (toast for quick confirmations), in short plain sentences that say what to do next. No raw Python error text shown to players.
+7. Messages: see Step 3: messages and errors.
 8. How to play: a short section with the goal, the five days, how demand works, loans, tournaments and upgrades, written in plain English.
 9. Small fixes found in manual testing: "You are Ready" message must clear when the next day starts; price field must start at the product current price; Buy upgrade button must show Owned immediately; the screen must show the final state right after the last action without a manual refresh.
 
@@ -36,4 +36,25 @@ Signed out; practice start; practice after buying; day result; end of run; advis
 1. Look: theme, page config, header, tabs, How to play skeleton.
 2. Screens: Practice and Tournaments layout, cards, buttons, positions.
 3. Messages and errors, small fixes, polish, test on the deployed app.
-Status: step 1 merged; step 2 in progress (design system done, tournaments in progress)
+
+## Step 3: messages and errors
+
+- Players never see raw technical text. `db.DatabaseUnavailable` and any unexpected error show: “We could not reach the game right now. Please try again in a moment.” `ValueError` messages from `logic.py` are written for players and show unchanged.
+- After a successful tournament action (Buy stock, Set price, Buy upgrade, Ready, or Close day), reload the page immediately and show the updated cash, stock, prices, upgrade ownership, readiness, day and ranking. Store the one-time message in `st.session_state`; show it once, then clear it.
+- Show each message beside the action that caused it: Buy stock and Set price messages inside their card, the upgrade message under its row, and Ready and Close day messages directly under their buttons.
+- After Ready, replace the Ready button immediately with “You are Ready. Waiting for the other players.” Clear that message when the day advances.
+- Show the “Tournament created” message and join code once, then clear them when the player does something else.
+- The tournament Price (€) input starts at the current price of the selected product and follows product selection.
+- Practice price, loan and stock purchases show a short success confirmation as a one-time toast message.
+
+### Out of scope for step 3
+
+- Changes to `logic.py`, `db.py`, tests, game rules, labels of existing buttons, charts or design.
+
+### Done when
+
+- All items above work on localhost and on the deployed app with two accounts.
+- `uv run pytest` passes; the 243 existing tests remain unchanged.
+- Invalid input never shows technical text.
+
+Status: step 1 merged; step 2 merged; step 3 in progress

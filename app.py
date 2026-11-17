@@ -9,6 +9,45 @@ import weather
 
 DB_PATH = db.DEFAULT_PATH
 
+
+def friendly_error(error):
+    if isinstance(error, ValueError):
+        return str(error)
+    return "We could not reach the game right now. Please try again in a moment."
+
+
+def flash(scope, message, kind="success"):
+    st.session_state[f"flash_{scope}"] = {"message": message, "kind": kind}
+
+
+def notice(kind, message):
+    icons = {"success": "check", "error": "alert", "info": "info", "warning": "alert"}
+    st.markdown(
+        f'<div class="notice notice-{kind}"><span class="notice-icon">{icon(icons[kind], 20)}</span>'
+        f'<span>{html.escape(str(message))}</span></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def show_flash(scope):
+    item = st.session_state.pop(f"flash_{scope}", None)
+    if not item:
+        return
+    message = item["message"]
+    kind = item.get("kind", "success")
+    if kind == "closed_day":
+        show_closed_day(message, PLAYER, scope)
+    elif kind == "toast":
+        st.toast(message)
+    elif kind == "error":
+        notice("error", message)
+    elif kind == "info":
+        notice("info", message)
+    elif kind == "warning":
+        notice("warning", message)
+    else:
+        notice("success", message)
+
 st.set_page_config(page_title="Campus Tycoon", page_icon=":material/local_cafe:", layout="wide")
 
 
@@ -25,6 +64,8 @@ ICONS = {
     "sun": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
     "cloud-sun": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17a5 5 0 1 1 1-9.9A7 7 0 0 1 21 11a4 4 0 0 1-1 6H7Z"/><path d="M12 2v2m-5 .2 1.4 1.4M3 10h2"/></svg>',
     "check": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>',
+    "alert": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 2.6 17.2A2 2 0 0 0 4.3 20h15.4a2 2 0 0 0 1.7-2.8L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4m0 4h.01"/></svg>',
+    "info": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>',
     "clock": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
     "box": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8m-9 5v9"/></svg>',
 }
@@ -85,12 +126,27 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 [class*="st-key-tournament_close_"] button:hover { background:rgba(248,113,113,.24) !important; border-color:#F87171 !important; box-shadow:0 0 18px rgba(248,113,113,.28) !important; }
 [class*="st-key-tournament_upgrade_"] button { border-color:rgba(245,165,36,.7) !important; box-shadow:0 0 10px rgba(245,165,36,.16); }
 [class*="st-key-tournament_upgrade_"] button:hover { box-shadow:0 0 18px rgba(245,165,36,.3); }
-[data-baseweb="select"] > div, [data-baseweb="input"], [data-baseweb="base-input"], [data-testid="stNumberInput"] > div, [data-testid="stTextInput"] > div { background:rgba(255,255,255,.08) !important; border:1px solid rgba(255,255,255,.18) !important; border-radius:12px !important; box-shadow:none !important; }
+[data-testid="stNumberInputContainer"], [data-testid="stTextInput"] [data-baseweb="input"], [data-testid="stTextInput"] [data-baseweb="base-input"], [data-testid="stSelectbox"] [data-baseweb="select"] > div, [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stNumberInputContainer"], [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stTextInput"] [data-baseweb="input"], [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stTextInput"] [data-baseweb="base-input"], [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stSelectbox"] [data-baseweb="select"] > div { background:rgba(0,0,0,.28) !important; border:1px solid rgba(255,255,255,.14) !important; border-radius:12px !important; box-shadow:none !important; background-image:none !important; -webkit-backdrop-filter:none !important; backdrop-filter:none !important; }
+[data-testid="stNumberInputContainer"]::before, [data-testid="stNumberInputContainer"]::after, [data-testid="stTextInput"] [data-baseweb="input"]::before, [data-testid="stTextInput"] [data-baseweb="input"]::after, [data-testid="stTextInput"] [data-baseweb="base-input"]::before, [data-testid="stTextInput"] [data-baseweb="base-input"]::after, [data-testid="stSelectbox"] [data-baseweb="select"] > div::before, [data-testid="stSelectbox"] [data-baseweb="select"] > div::after { content:none !important; display:none !important; }
+[data-testid="stNumberInput"] [data-baseweb="input"]::after, [data-testid="stNumberInput"] [data-baseweb="input"]::before, [data-testid="stNumberInput"] [data-baseweb="base-input"]::after, [data-testid="stNumberInput"] [data-baseweb="base-input"]::before, [data-testid="stNumberInput"] [class*="Instructions"], [data-testid="stNumberInput"] [class*="Progress"], [data-testid="stNumberInput"] [class*="Underline"], [data-testid="stNumberInput"] [class*="Highlight"], [data-testid="stTextInput"] [data-baseweb="input"]::after, [data-testid="stTextInput"] [data-baseweb="input"]::before, [data-testid="stTextInput"] [data-baseweb="base-input"]::after, [data-testid="stTextInput"] [data-baseweb="base-input"]::before, [data-testid="stTextInput"] [class*="Instructions"], [data-testid="stTextInput"] [class*="Progress"], [data-testid="stTextInput"] [class*="Underline"], [data-testid="stTextInput"] [class*="Highlight"], [data-testid="stSelectbox"] [data-baseweb="input"]::after, [data-testid="stSelectbox"] [data-baseweb="input"]::before, [data-testid="stSelectbox"] [data-baseweb="base-input"]::after, [data-testid="stSelectbox"] [data-baseweb="base-input"]::before, [data-testid="stSelectbox"] [class*="Instructions"], [data-testid="stSelectbox"] [class*="Progress"], [data-testid="stSelectbox"] [class*="Underline"], [data-testid="stSelectbox"] [class*="Highlight"] { display:none !important; content:none !important; border-bottom:0 !important; box-shadow:none; background:none; height:0; }
+[data-testid="stNumberInput"] [data-baseweb="input"], [data-testid="stNumberInput"] [data-baseweb="base-input"], [data-testid="stTextInput"] [data-baseweb="input"], [data-testid="stTextInput"] [data-baseweb="base-input"], [data-testid="stSelectbox"] [data-baseweb="input"], [data-testid="stSelectbox"] [data-baseweb="base-input"] { background-image:none !important; }
+[data-testid="stNumberInput"] .react-aria-TextField::before, [data-testid="stNumberInput"] .react-aria-TextField::after, [data-testid="stNumberInputContainer"]::before, [data-testid="stNumberInputContainer"]::after, [data-testid="stNumberInput"] *::before, [data-testid="stNumberInput"] *::after, [data-testid="stTextInput"] .react-aria-TextField::before, [data-testid="stTextInput"] .react-aria-TextField::after, [data-testid="stTextInput"] *::before, [data-testid="stTextInput"] *::after, [data-testid="stSelectbox"] *::before, [data-testid="stSelectbox"] *::after { content:none !important; display:none !important; }
+.react-aria-TextField, [data-testid="stNumberInputContainer"], [data-testid="stNumberInputField"], [data-testid="stTextInput"] .react-aria-TextField, [data-testid="stSelectbox"] [data-baseweb="select"] { border-bottom:0; background-image:none !important; outline:none !important; }
+[data-testid="stNumberInput"] .react-aria-TextField ~ *, [data-testid="stTextInput"] .react-aria-TextField ~ * { display:none !important; }
+[data-testid="stNumberInputContainer"]:focus-within { border-color:rgba(245,165,36,.7) !important; box-shadow:0 0 0 1px rgba(245,165,36,.25),0 0 12px rgba(245,165,36,.25) !important; }
+[data-testid="stTextInput"] [data-baseweb="input"]:focus-within, [data-testid="stTextInput"] [data-baseweb="base-input"]:focus-within, [data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within { border-color:rgba(245,165,36,.7) !important; box-shadow:0 0 0 1px rgba(245,165,36,.25),0 0 12px rgba(245,165,36,.25) !important; }
+[data-testid="stNumberInput"]:focus-within > div, [data-testid="stNumberInput"]:focus-within .react-aria-TextField, [data-testid="stNumberInput"]:focus-within [data-testid="stNumberInputField"], [data-testid="stTextInput"]:focus-within > div, [data-testid="stTextInput"]:focus-within .react-aria-TextField, [data-testid="stSelectbox"]:focus-within [data-baseweb="select"] { box-shadow:none !important; }
 [data-baseweb="select"] input, [data-baseweb="input"] input, [data-baseweb="base-input"] input, [data-testid="stNumberInput"] input, [data-testid="stTextInput"] input, [data-baseweb="input"] > div, [data-baseweb="base-input"] > div, [data-testid="stNumberInput"] button { background:transparent !important; border:0 !important; box-shadow:none !important; }
-[data-baseweb="select"]:focus-within > div, [data-baseweb="input"]:focus-within, [data-baseweb="base-input"]:focus-within, [data-testid="stNumberInput"]:focus-within > div, [data-testid="stTextInput"]:focus-within > div { border-color:rgba(245,165,36,.7) !important; box-shadow:0 0 0 1px rgba(245,165,36,.25),0 0 14px rgba(245,165,36,.18) !important; }
+[data-baseweb="select"]:focus-within > div, [data-baseweb="input"]:focus-within, [data-baseweb="base-input"]:focus-within { border-color:rgba(245,165,36,.7) !important; box-shadow:0 0 0 1px rgba(245,165,36,.25),0 0 14px rgba(245,165,36,.18) !important; }
 [data-baseweb="popover"] [role="listbox"], [data-baseweb="menu"] { background:rgba(40,25,18,.92) !important; border-radius:14px !important; }
 [data-baseweb="popover"] [role="option"]:hover, [data-baseweb="menu"] [role="option"]:hover { background:rgba(245,165,36,.2) !important; }
-[class*="st-key-action_"] { min-height:23rem; }
+[class*="st-key-action_"] { min-height:27rem; padding-bottom:1.25rem !important; }
+[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-tournament_name),
+[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-tournament_join_code) { padding-bottom:1.25rem !important; }
+[class*="st-key-action_"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-tournament_name) [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
+[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-tournament_join_code) [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child,
+[class*="st-key-upgrade_tournament_"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child { margin-bottom:0 !important; }
 [data-testid="stExpander"] details, [data-testid="stExpander"] summary, [data-testid="stExpander"] [data-testid="stExpanderDetails"] { border:none !important; background:transparent !important; box-shadow:none !important; border-radius:inherit !important; outline:none !important; }
 [data-testid="stExpander"] [data-testid="stExpanderDetails"] { border-top:0 !important; }
 [data-testid="stTabs"], [data-testid="stTabs"] > *, [data-testid="stTabs"] [role="tablist"], [data-testid="stTabs"] [role="tablist"] > *, [data-testid="stTabs"] [role="tablist"] > * > * { border:0 !important; border-bottom:0 !important; box-shadow:none !important; background:transparent !important; }
@@ -114,7 +170,7 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 [class*="st-key-tournament_product_card_"] { box-sizing:border-box; min-height:9.5rem; padding-bottom:18px !important; height:auto !important; overflow:visible !important; }
 [class*="st-key-product_card_"] .stat-grid .stat-box:last-child, [class*="st-key-tournament_product_card_"] .stat-grid .stat-box:last-child { margin-bottom:0; }
 [class*="st-key-tournament_card_"] { padding-bottom:1.25rem; height:auto !important; overflow:visible !important; }
-[class*="st-key-upgrade_tournament_"] { box-sizing:border-box; padding:10px 16px !important; margin:8px 0; background:rgba(255,255,255,.06) !important; border:1px solid rgba(255,255,255,.12) !important; border-radius:16px !important; }
+[class*="st-key-upgrade_tournament_"] { box-sizing:border-box; padding:10px 16px 1.25rem !important; margin:8px 0; background:rgba(255,255,255,.06) !important; border:1px solid rgba(255,255,255,.12) !important; border-radius:16px !important; }
 .tournament-upgrade-content { display:flex; align-items:center; gap:12px; min-width:0; height:2.75rem; margin:0; padding:0; line-height:1; white-space:nowrap; }
 .tournament-upgrade-content > * { margin:0; padding:0; line-height:1; vertical-align:middle; }
 .tournament-upgrade-name { font-weight:800; white-space:nowrap; }
@@ -138,6 +194,14 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 .mini-card:hover { transform:translateY(-2px); background:linear-gradient(135deg,rgba(255,255,255,.21),rgba(255,255,255,.08)); border-color:rgba(245,165,36,.45); }
 .app-icon { display:inline-flex; color:var(--amber); vertical-align:middle; flex:none; }
 .app-icon svg { width:100%; height:100%; }
+.notice { display:flex; align-items:center; gap:12px; margin:12px 0 18px 0; padding:12px 16px; background:rgba(20,12,8,.45); border:1px solid; border-radius:14px; color:var(--text); font-size:.95rem; line-height:1.35; }
+.notice-success { --notice-color:#4ADE80; --notice-icon-bg:rgba(74,222,128,.18); background:linear-gradient(rgba(74,222,128,.08),transparent),rgba(20,12,8,.45); border-color:rgba(74,222,128,.28); }
+.notice-error { --notice-color:#F87171; --notice-icon-bg:rgba(248,113,113,.18); background:linear-gradient(rgba(248,113,113,.08),transparent),rgba(20,12,8,.45); border-color:rgba(248,113,113,.28); }
+.notice-info { --notice-color:#F5A524; --notice-icon-bg:rgba(245,165,36,.18); background:linear-gradient(rgba(245,165,36,.08),transparent),rgba(20,12,8,.45); border-color:rgba(245,165,36,.28); }
+.notice-warning { --notice-color:#FF7A18; --notice-icon-bg:rgba(255,122,24,.18); background:linear-gradient(rgba(255,122,24,.08),transparent),rgba(20,12,8,.45); border-color:rgba(255,122,24,.28); }
+.notice-icon { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; flex:none; border-radius:50%; background:var(--notice-icon-bg); color:var(--notice-color); }
+.notice-icon .app-icon { color:var(--notice-color); }
+.notice-icon svg { width:20px; height:20px; }
 [data-testid="stDataFrame"], [data-testid="stTable"] { color:var(--text); }
 [data-testid="stTable"] table { background:transparent !important; border-collapse:separate; border-spacing:0; border-radius:14px; overflow:hidden; }
 [data-testid="stTable"] th, [data-testid="stTable"] td { background:transparent !important; border-left:none !important; border-right:none !important; border-top:none !important; border-bottom:1px solid rgba(255,255,255,.12) !important; padding:10px 14px !important; color:var(--text); }
@@ -167,7 +231,7 @@ if not st.user.is_logged_in:
     with sign_in_column:
         show_hero()
         st.markdown('<div style="text-align:center">Welcome! Run a small campus shop for five days. Sign in to play.</div>', unsafe_allow_html=True)
-        if st.button("Sign in with Google", type="primary", icon=":material/login:", use_container_width=True):
+        if st.button("Sign in with Google", key="sign_in_button", type="primary", icon=":material/login:", use_container_width=True):
             st.login()
         mini_columns = st.columns(3)
         for mini_column, glyph, caption in zip(mini_columns, ("cart", "trending-up", "trophy"), ("Buy stock", "Set prices", "Beat the market")):
@@ -179,8 +243,8 @@ if not st.user.is_logged_in:
 try:
     PLAYER = logic.player_from_user(st.user)
 except ValueError as error:
-    st.error(str(error))
-    if st.button("Sign out", icon=":material/logout:"):
+    notice("error", friendly_error(error))
+    if st.button("Sign out", key="sign_out_error_button", icon=":material/logout:"):
         st.logout()
     st.stop()
 
@@ -189,13 +253,13 @@ col1, col2 = st.columns([5, 1], vertical_alignment="center")
 with col1:
     st.caption(f"Signed in as {PLAYER}")
 with col2:
-    if st.button("Sign out", icon=":material/logout:", use_container_width=True):
+    if st.button("Sign out", key="sign_out_button", icon=":material/logout:", use_container_width=True):
         st.logout()
 
 try:
     game = logic.load_game(DB_PATH, PLAYER)
 except db.DatabaseUnavailable as error:
-    st.error(str(error))
+    notice("error", friendly_error(error))
     st.stop()
 run_complete = logic.is_run_complete(game)
 
@@ -215,6 +279,7 @@ practice_tab, tournament_tab, help_tab = st.tabs([
 ])
 
 with practice_tab:
+    show_flash("practice")
 
     if run_complete:
         final = logic.final_result(game)
@@ -226,32 +291,32 @@ with practice_tab:
         col4.metric("Overall gain or loss", f"€{final['gain']:.2f}")
         email_status = st.session_state.pop("email_status", None)
         if email_status == "sent":
-            st.success(f"Your result was emailed to {PLAYER}.")
+            notice("success", f"Your result was emailed to {PLAYER}.")
         elif email_status == "skipped":
-            st.info("Result email is not configured, so no email was sent.")
+            notice("info", "Result email is not configured, so no email was sent.")
         elif email_status == "failed":
-            st.warning("We could not send the email, but your result is saved.")
+            notice("warning", "We could not send the email, but your result is saved.")
 
     if not run_complete:
-      with st.expander("AI business advisor"):
-        if st.button("Ask the advisor", icon=":material/psychology:"):
-            api_key = st.secrets.get("OPENROUTER_API_KEY", "")
-            advice = logic.get_advice(
-                game,
-                lambda prompt: advisor.ask_openrouter(prompt, api_key),
-            )
-            label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
-            st.write(label)
-            st.table(
-                [
-                    {
-                        "Product": product,
-                        "Price": f"€{line['price']:.2f}",
-                        "Reason": line["reason"],
-                    }
-                    for product, line in advice["prices"].items()
-                ]
-            )
+        with st.expander("AI business advisor"):
+            if st.button("Ask the advisor", key="practice_advisor_button", icon=":material/psychology:"):
+                api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+                advice = logic.get_advice(
+                    game,
+                    lambda prompt: advisor.ask_openrouter(prompt, api_key),
+                )
+                label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
+                st.write(label)
+                st.table(
+                    [
+                        {
+                            "Product": product,
+                            "Price": f"€{line['price']:.2f}",
+                            "Reason": line["reason"],
+                        }
+                        for product, line in advice["prices"].items()
+                    ]
+                )
 
     with st.expander("New run", expanded=run_complete):
         new_level = st.selectbox(
@@ -262,20 +327,20 @@ with practice_tab:
             key="new_run_level",
         )
         if not st.session_state.get("confirm_new_run"):
-            if st.button("Start a new run", icon=":material/restart_alt:"):
+            if st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:"):
                 st.session_state["confirm_new_run"] = True
                 st.rerun()
         else:
-            st.warning(f"Start a new {new_level} run? The current run and its history will be lost.")
+            notice("warning", f"Start a new {new_level} run? The current run and its history will be lost.")
             col1, col2 = st.columns(2)
-            if col1.button("Yes, start a new run", icon=":material/check:"):
+            if col1.button("Yes, start a new run", key="practice_confirm_new_run_button", icon=":material/check:"):
                 try:
                     logic.new_run(DB_PATH, PLAYER, new_level)
                     st.session_state["confirm_new_run"] = False
                     st.rerun()
                 except (ValueError, db.DatabaseUnavailable) as error:
-                    st.error(str(error))
-            if col2.button("Cancel", icon=":material/close:"):
+                    notice("error", friendly_error(error))
+            if col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:"):
                 st.session_state["confirm_new_run"] = False
                 st.rerun()
 
@@ -300,54 +365,57 @@ with practice_tab:
 
     action_columns = st.columns(3)
     with action_columns[0]:
-      with st.container(border=True, key="action_price"):
-        section_heading("trending-up", "Selling price")
-        price_product = st.selectbox("Product", list(logic.PRODUCTS), key="price_product")
-        new_price = st.number_input(
-            "Price (€)", step=0.01, value=game["price"][price_product], format="%.2f",
-            key=f"price_{price_product}",
-        )
-        if st.button("Set price", icon=":material/sell:", use_container_width=True):
-            try:
-                logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
-                st.rerun()
-            except (ValueError, db.DatabaseUnavailable) as error:
-                st.error(str(error))
+        with st.container(border=True, key="action_price"):
+            section_heading("trending-up", "Selling price")
+            price_product = st.selectbox("Product", list(logic.PRODUCTS), key="price_product")
+            new_price = st.number_input(
+                "Price (€)", step=0.01, value=game["price"][price_product], format="%.2f",
+                key=f"price_{price_product}",
+            )
+            if st.button("Set price", key="practice_price_button", icon=":material/sell:", use_container_width=True):
+                try:
+                    logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
+                    flash("practice", "Price updated.", kind="toast")
+                    st.rerun()
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
 
     with action_columns[1]:
-      with st.container(border=True, key="action_loan"):
-        section_heading("wallet", "Loan")
-        st.caption(
-            f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
-            f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
-        )
-        has_loan = game["debt"] > 0
-        loan_amount = st.number_input(
-            "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
-            key="loan_amount",
-        )
-        st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
-        if st.button("Take loan", icon=":material/account_balance_wallet:", disabled=run_complete or has_loan, use_container_width=True):
-            try:
-                logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
-                st.rerun()
-            except (ValueError, db.DatabaseUnavailable) as error:
-                st.error(str(error))
+        with st.container(border=True, key="action_loan"):
+            section_heading("wallet", "Loan")
+            st.caption(
+                f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
+                f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
+            )
+            has_loan = game["debt"] > 0
+            loan_amount = st.number_input(
+                "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
+                key="loan_amount",
+            )
+            st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
+            if st.button("Take loan", key="practice_loan_button", icon=":material/account_balance_wallet:", disabled=run_complete or has_loan, use_container_width=True):
+                try:
+                    logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
+                    flash("practice", "Loan taken.", kind="toast")
+                    st.rerun()
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
 
     with action_columns[2]:
-      with st.container(border=True, key="action_buy"):
-        section_heading("cart", "Buy")
-        buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
-        quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
-        st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
-        if st.button("Buy", disabled=run_complete, use_container_width=True, icon=":material/shopping_cart:"):
-            try:
-                logic.buy(DB_PATH, PLAYER, buy_product, int(quantity))
-                st.rerun()
-            except (ValueError, db.DatabaseUnavailable) as error:
-                st.error(str(error))
+        with st.container(border=True, key="action_buy"):
+            section_heading("cart", "Buy")
+            buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
+            quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key="practice_buy_quantity")
+            st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
+            if st.button("Buy", key="practice_buy_button", disabled=run_complete, use_container_width=True, icon=":material/shopping_cart:"):
+                try:
+                    logic.buy(DB_PATH, PLAYER, buy_product, int(quantity))
+                    flash("practice", "Stock bought.", kind="toast")
+                    st.rerun()
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
 
-    if st.button("Trade one day", disabled=run_complete, type="primary", use_container_width=True, icon=":material/play_arrow:"):
+    if st.button("Trade one day", key="practice_trade_day_button", disabled=run_complete, type="primary", use_container_width=True, icon=":material/play_arrow:"):
         try:
             logic.trade_day(DB_PATH, PLAYER)
             game = logic.load_game(DB_PATH, PLAYER)
@@ -358,13 +426,13 @@ with practice_tab:
                     )
             st.rerun()
         except (ValueError, db.DatabaseUnavailable) as error:
-            st.error(str(error))
+            notice("error", friendly_error(error))
 
     section_heading("trending-up", "Results")
     try:
         results = logic.get_results(DB_PATH, PLAYER)
     except db.DatabaseUnavailable as error:
-        st.error(str(error))
+        notice("error", friendly_error(error))
         results = []
 
     # History charts: built only from this player's own saved results.
@@ -388,10 +456,10 @@ with practice_tab:
                     x_label="Day", y_label="Gross profit (€)",
                 )
     else:
-        st.info("Trade a day to see your charts.")
+        notice("info", "Trade a day to see your charts.")
 
     for result in reversed(results):
-        with st.container(border=True):
+        with st.container(border=True, key=f"practice_result_day_{result['day']}"):
             st.markdown(f'### Day {result["day"]}')
             rows = []
             for name, line in list(result["by_product"].items()) + [("Total", result["total"])]:
@@ -416,9 +484,9 @@ with practice_tab:
             icon=":material/download:",
         )
 
-def show_closed_day(closed_day, player):
-    with st.container(border=True):
-        st.success(f"Day {closed_day['day']} closed.")
+def show_closed_day(closed_day, player, scope):
+    with st.container(border=True, key=f"{scope}_closed_day"):
+        notice("success", f"Day {closed_day['day']} closed.")
         own_sales = closed_day.get("by_player", {}).get(player)
         if own_sales is not None:
             st.table(
@@ -445,29 +513,25 @@ def show_tournament(stand, player):
             weather_name = "normal"
         weather_icon, weather_label = {"rain": ("cloud-rain", "Rain"), "hot": ("sun", "Hot"), "normal": ("cloud-sun", "Normal")}[weather_name]
     except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
+        notice("error", friendly_error(error))
         return
     try:
         status = logic.tournament_status(DB_PATH, player, tournament_id)
     except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
+        notice("error", friendly_error(error))
         return
 
-    action_error = None
-    action_message = None
-    closed_day = None
     products = list(logic.PRODUCTS)
     own_player = next((row for row in status["players"] if row["player"] == player), None)
-    is_ready = bool(own_player and own_player["ready"])
-
-    # Reload after actions so the displayed state reflects this run's changes.
+    # Reload status so readiness and all displayed tournament data are current.
     try:
         status = logic.tournament_status(DB_PATH, player, tournament_id)
         stands = logic.get_my_stands(DB_PATH, player)
     except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
+        notice("error", friendly_error(error))
         return
     own_player = next((row for row in status["players"] if row["player"] == player), None)
+    is_ready = bool(own_player and own_player["ready"])
     current_stand = next((item for item in stands if item["id"] == tournament_id), None)
     if current_stand is None:
         return
@@ -514,31 +578,34 @@ def show_tournament(stand, player):
             with st.container(border=True, key=f"action_t{tournament_id}_buy"):
                 section_heading("cart", "Buy stock")
                 if status["day"] <= logic.RUN_DAYS and not is_ready:
-                    with st.form(f"tournament_buy_form_{tournament_id}"):
-                        buy_product = st.selectbox("Product", products, key=f"tournament_buy_product_{tournament_id}")
-                        quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key=f"tournament_quantity_{tournament_id}")
-                        buy_submitted = st.form_submit_button("Buy", use_container_width=True)
+                    buy_product = st.selectbox("Product", products, key=f"tournament_buy_product_{tournament_id}")
+                    quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key=f"tournament_quantity_{tournament_id}")
+                    buy_submitted = st.button("Buy", key=f"t{tournament_id}_buy_button", use_container_width=True)
                     if buy_submitted:
                         try:
                             logic.buy_tournament_stock(DB_PATH, player, tournament_id, buy_product, int(quantity))
-                            action_message = "Stock purchased."
+                            flash(f"t{tournament_id}_buy", "Stock purchased.")
+                            st.rerun()
                         except (ValueError, db.DatabaseUnavailable) as error:
-                            action_error = str(error)
+                            notice("error", friendly_error(error))
+                    show_flash(f"t{tournament_id}_buy")
 
         with action_columns[1]:
             with st.container(border=True, key=f"action_t{tournament_id}_price"):
                 section_heading("trending-up", "Set price")
                 if status["day"] <= logic.RUN_DAYS and not is_ready:
-                    with st.form(f"tournament_price_form_{tournament_id}"):
-                        price_product = st.selectbox("Product", products, key=f"tournament_price_product_{tournament_id}")
-                        price = st.number_input("Price (€)", min_value=0.01, step=0.01, value=1.0, format="%.2f", key=f"tournament_price_{tournament_id}")
-                        price_submitted = st.form_submit_button("Set price", use_container_width=True)
+                    price_product = st.selectbox("Product", products, key=f"tournament_price_product_{tournament_id}")
+                    current_price = next((item["price"] for item in current_stand["products"] if item["product"] == price_product), 1.0)
+                    price = st.number_input("Price (€)", min_value=0.01, step=0.01, value=float(current_price), format="%.2f", key=f"t{tournament_id}_price_input_{price_product}")
+                    price_submitted = st.button("Set price", key=f"t{tournament_id}_price_button", use_container_width=True)
                     if price_submitted:
                         try:
                             logic.set_tournament_price(DB_PATH, player, tournament_id, price_product, round(float(price), 2))
-                            action_message = "Price updated."
+                            flash(f"t{tournament_id}_price", "Price updated.")
+                            st.rerun()
                         except (ValueError, db.DatabaseUnavailable) as error:
-                            action_error = str(error)
+                            notice("error", friendly_error(error))
+                    show_flash(f"t{tournament_id}_price")
 
         try:
             owned = logic.tournament_upgrades(DB_PATH, player, tournament_id)
@@ -563,38 +630,40 @@ def show_tournament(stand, player):
                         elif status["day"] <= logic.RUN_DAYS and not is_ready:
                             if st.button(
                                 f"Buy {name} (€{details['cost']:.2f})", icon=":material/upgrade:",
-                                key=f"tournament_upgrade_{tournament_id}_{name}", use_container_width=True,
+                                key=f"t{tournament_id}_upgrade_{name}_button", use_container_width=True,
                             ):
                                 try:
                                     logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, name)
-                                    action_message = "Upgrade purchased."
+                                    flash(f"t{tournament_id}_upgrade", "Upgrade purchased.")
+                                    st.rerun()
                                 except (ValueError, db.DatabaseUnavailable) as error:
-                                    action_error = str(error)
+                                    notice("error", friendly_error(error))
+                    show_flash(f"t{tournament_id}_upgrade")
         except (ValueError, db.DatabaseUnavailable) as error:
-            st.error(str(error))
+            notice("error", friendly_error(error))
 
         if status["day"] <= logic.RUN_DAYS and not is_ready:
-            if st.button("Ready", key=f"tournament_ready_{tournament_id}", icon=":material/check:", type="primary", use_container_width=True):
+            if st.button("Ready", key=f"t{tournament_id}_ready_button", icon=":material/check:", type="primary", use_container_width=True):
                 try:
                     result = logic.ready_tournament(DB_PATH, player, tournament_id)
-                    action_message = "You are Ready."
-                    closed_day = result.get("closed_day")
+                    flash(f"t{tournament_id}_ready", "You are Ready.")
+                    st.rerun()
                 except (ValueError, db.DatabaseUnavailable) as error:
-                    action_error = str(error)
+                    notice("error", friendly_error(error))
+        elif own_player and own_player["ready"] and status["day"] <= logic.RUN_DAYS:
+            notice("info", "You are Ready. Waiting for the other players.")
+        show_flash(f"t{tournament_id}_ready")
         if player == status["organiser"] and status["day"] <= logic.RUN_DAYS and st.button(
-            "Close day now", key=f"tournament_close_{tournament_id}", icon=":material/lock_clock:",
+            "Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:",
             use_container_width=True,
         ):
             try:
                 closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
+                flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
+                st.rerun()
             except (ValueError, db.DatabaseUnavailable) as error:
-                action_error = str(error)
-        if action_error:
-            st.error(action_error)
-        if action_message:
-            st.success(action_message)
-        if closed_day:
-            show_closed_day(closed_day, player)
+                notice("error", friendly_error(error))
+        show_flash(f"t{tournament_id}_close")
 
         if status["day"] == logic.RUN_DAYS + 1:
             section_heading("trophy", "Ranking")
@@ -614,7 +683,7 @@ def show_tournament(stand, player):
                         unsafe_allow_html=True,
                     )
             except (ValueError, db.DatabaseUnavailable) as error:
-                st.error(str(error))
+                notice("error", friendly_error(error))
         section_heading("users", "Players")
         for row in status["players"]:
             ready_label = "Ready" if row["ready"] else "Not ready"
@@ -625,48 +694,45 @@ def show_tournament(stand, player):
                 f'<span style="padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.07);color:{ready_color};font-size:.8rem;font-weight:700">{ready_label}</span></div>',
                 unsafe_allow_html=True,
             )
-        if own_player and own_player["ready"] and status["day"] <= logic.RUN_DAYS:
-            st.info("You are Ready. Waiting for the other players.")
-
 with tournament_tab:
     create_column, join_column = st.columns(2)
     with create_column:
-      with st.container(border=True):
-        section_heading("trophy", "Create a tournament")
-        tournament_name = st.text_input("Tournament name", key="tournament_name")
-        if st.button("Create tournament", type="primary", icon=":material/add_circle:", use_container_width=True):
-            try:
-                created = logic.create_tournament(DB_PATH, PLAYER, tournament_name)
-                st.session_state["created_tournament"] = created
-                st.rerun()
-            except (ValueError, db.DatabaseUnavailable) as error:
-                st.error(str(error))
-        created = st.session_state.get("created_tournament")
-        if created:
-            st.success(f"Tournament created: {created['name']}")
-            st.caption(f"Join code: {created['code']}")
+        with st.container(border=True):
+            section_heading("trophy", "Create a tournament")
+            tournament_name = st.text_input("Tournament name", key="tournament_name")
+            if st.button("Create tournament", key="tournament_create_button", type="primary", icon=":material/add_circle:", use_container_width=True):
+                try:
+                    created = logic.create_tournament(DB_PATH, PLAYER, tournament_name)
+                    st.session_state["created_tournament"] = created
+                    st.rerun()
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
+            created = st.session_state.pop("created_tournament", None)
+            if created:
+                notice("success", f"Tournament created: {created['name']}")
+                st.caption(f"Join code: {created['code']}")
 
     with join_column:
-      with st.container(border=True):
-        section_heading("users", "Join a tournament")
-        join_code = st.text_input("Join code", key="tournament_join_code")
-        if st.button("Join tournament", icon=":material/login:", use_container_width=True):
-            try:
-                joined = logic.join_tournament(DB_PATH, PLAYER, join_code)
-                st.session_state["joined_message"] = (
-                    f"Joined {joined['name']} in seat {joined['seat']}."
-                )
-                st.rerun()
-            except (ValueError, db.DatabaseUnavailable) as error:
-                st.error(str(error))
-        joined_message = st.session_state.pop("joined_message", None)
-        if joined_message:
-            st.success(joined_message)
+        with st.container(border=True):
+            section_heading("users", "Join a tournament")
+            join_code = st.text_input("Join code", key="tournament_join_code")
+            if st.button("Join tournament", key="tournament_join_button", icon=":material/login:", use_container_width=True):
+                try:
+                    joined = logic.join_tournament(DB_PATH, PLAYER, join_code)
+                    st.session_state["joined_message"] = (
+                        f"Joined {joined['name']} in seat {joined['seat']}."
+                    )
+                    st.rerun()
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
+            joined_message = st.session_state.pop("joined_message", None)
+            if joined_message:
+                notice("success", joined_message)
 
     try:
         my_stands = logic.get_my_stands(DB_PATH, PLAYER)
     except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
+        notice("error", friendly_error(error))
         my_stands = []
 
     if my_stands:
@@ -688,6 +754,6 @@ with help_tab:
     for index, (glyph, heading, body) in enumerate(help_content):
         target = help_columns[index % 2] if index < 4 else st.container()
         with target:
-            with st.container(border=True):
+            with st.container(border=True, key=f"help_section_{heading}"):
                 st.markdown(f'<div class="section-heading">{icon(glyph)} {heading}</div>', unsafe_allow_html=True)
                 st.write(body)
