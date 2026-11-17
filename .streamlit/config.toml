@@ -6,9 +6,9 @@
 showErrorDetails = "none"
 
 [theme]
-base = "light"
-primaryColor = "#8B4A1F"
-backgroundColor = "#FBF3E4"
-secondaryBackgroundColor = "#F1E2C8"
-textColor = "#2E1F14"
+base = "dark"
+primaryColor = "#F5A524"
+backgroundColor = "#2A1A12"
+secondaryBackgroundColor = "#3A261C"
+textColor = "#F6EBDD"
 font = "sans serif"
