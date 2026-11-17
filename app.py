@@ -8,11 +8,75 @@ import weather
 
 DB_PATH = db.DEFAULT_PATH
 
-st.set_page_config(page_title="Campus Tycoon", page_icon="☕", layout="wide")
+st.set_page_config(page_title="Campus Tycoon", page_icon=":material/local_cafe:", layout="wide")
+
+
+ICONS = {
+    "coffee": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M17 10h1a3 3 0 0 1 0 6h-2M7 3v2m5-2v2m5-2v2"/></svg>',
+    "croissant": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8c1-3 4-5 7-5s6 2 7 5l2 8-5 5-4-3-4 3-5-5 2-8Z"/><path d="m5 8 5 5m9-5-5 5m-6 6 3-6m8 6-3-6"/></svg>',
+    "droplet": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s-7 7.5-7 12a7 7 0 0 0 14 0c0-4.5-7-12-7-12Z"/><path d="M9 16a3 3 0 0 0 3 3"/></svg>',
+    "cart": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 3h2l3 12h12l3-9H5"/></svg>',
+    "wallet": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 8h18m-5 6h2M6 5V3h12v2"/></svg>',
+    "trending-up": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg>',
+    "trophy": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8m-4-4v4M7 4h10v6a5 5 0 0 1-10 0V4Z"/><path d="M7 7H4v2a4 4 0 0 0 4 4m9-6h3v2a4 4 0 0 1-4 4"/></svg>',
+    "users": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2H3Zm13-9a3 3 0 1 0 0-6m1 9a5 5 0 0 1 4 5v1h-3"/></svg>',
+    "cloud-rain": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15a5 5 0 1 1 1-9.9A7 7 0 0 1 21 9a4 4 0 0 1-1 6"/><path d="m8 17-1 3m6-3-1 3m6-3-1 3"/></svg>',
+    "sun": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+    "cloud-sun": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17a5 5 0 1 1 1-9.9A7 7 0 0 1 21 11a4 4 0 0 1-1 6H7Z"/><path d="M12 2v2m-5 .2 1.4 1.4M3 10h2"/></svg>',
+    "check": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>',
+    "clock": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    "box": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="M3 8v9l9 5 9-5V8m-9 5v9"/></svg>',
+}
+
+
+def icon(name, size=22):
+    svg = ICONS.get(name, ICONS["box"])
+    return f'<span class="app-icon" style="width:{size}px;height:{size}px">{svg}</span>'
+
+
+def inject_css():
+    st.markdown("""<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+:root { --bg1:#140B08; --glow1:#7A3B16; --glow2:#C2410C; --amber:#F5A524; --orange:#FF7A18; --text:#F6EBDD; --muted:#C9B8A6; --card:rgba(255,255,255,0.06); --card-border:rgba(255,255,255,0.10); --good:#4ADE80; --bad:#F87171; }
+html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
+.stApp { background: radial-gradient(900px 500px at 8% -5%, var(--glow1), transparent 60%), radial-gradient(800px 500px at 100% 0%, rgba(194,65,12,.22), transparent 55%), linear-gradient(180deg, #1B0F0A, var(--bg1)); background-attachment:fixed; color:var(--text); }
+[data-testid="stHeader"], [data-testid="stToolbar"] { background:transparent; }
+[data-testid="stMainBlockContainer"] { max-width:1240px; margin:0 auto; padding:2rem 2rem 4rem; }
+[data-testid="stMetric"], [data-testid="stVerticalBlockBorderWrapper"] { background:var(--card); border:1px solid var(--card-border); border-radius:20px; backdrop-filter:blur(12px); box-shadow:0 12px 36px rgba(0,0,0,.18); transition:transform .2s ease, box-shadow .2s ease; }
+[data-testid="stMetric"] { padding:16px; }
+[data-testid="stMetric"]:hover, [data-testid="stVerticalBlockBorderWrapper"]:hover { transform:translateY(-2px); box-shadow:0 16px 40px rgba(0,0,0,.25); }
+.stButton button, .stDownloadButton button { border-radius:14px; font-weight:700; transition:all .2s ease; }
+.stButton button[kind="primary"], .stDownloadButton button[kind="primary"] { background:linear-gradient(135deg,var(--amber),var(--orange)); border:0; color:#2B1608; }
+.stButton button[kind="primary"]:hover, .stDownloadButton button[kind="primary"]:hover { box-shadow:0 0 24px rgba(245,165,36,.35); }
+.stButton button:not([kind="primary"]), .stDownloadButton button:not([kind="primary"]) { background:transparent; border:1px solid var(--card-border); }
+.stButton button:not([kind="primary"]):hover, .stDownloadButton button:not([kind="primary"]):hover { border-color:var(--amber); color:var(--amber); }
+input, textarea, [data-baseweb="select"] > div { border-radius:12px !important; background:var(--card) !important; }
+[data-testid="stTabs"] [data-baseweb="tab-list"] { gap:8px; }
+[data-testid="stTabs"] [data-baseweb="tab-highlight"], [data-testid="stTabs"] [data-baseweb="tab-border"] { display:none; }
+[data-testid="stTabs"] [data-testid="stTab"], [data-testid="stTabs"] [role="tab"] { border-radius:999px; padding:8px 20px; background:var(--card); border:1px solid transparent; }
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] { background:linear-gradient(135deg,var(--amber),var(--orange)); color:#2B1608; }
+[data-testid="stMetricValue"] { color:var(--text); font-size:2rem; font-weight:800; }
+[data-testid="stMetricLabel"] { color:var(--muted); }
+.hero { background:linear-gradient(135deg,rgba(245,165,36,.18),rgba(255,122,24,.10)),var(--card); border:1px solid rgba(245,165,36,.28); border-radius:24px; padding:28px 32px; margin-bottom:12px; box-shadow:0 0 40px rgba(194,65,12,.12); backdrop-filter:blur(12px); }
+.hero h1 { background:linear-gradient(90deg,var(--amber),var(--orange)); background-clip:text; -webkit-background-clip:text; color:transparent; font-size:2.7rem; font-weight:800; margin:0; }
+.hero p { color:var(--muted); font-size:1rem; margin:4px 0 0; }
+.app-icon { display:inline-flex; color:var(--amber); vertical-align:middle; flex:none; }
+.app-icon svg { width:100%; height:100%; }
+[data-testid="stDataFrame"], [data-testid="stTable"] { color:var(--text); }
+[data-testid="stTable"] table { background:var(--card); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; scroll-behavior:auto !important; } }
+</style>""", unsafe_allow_html=True)
+
+
+inject_css()
+
+
+def show_hero():
+    st.markdown(f'<div class="hero"><h1>{icon("coffee", 30)} Campus Tycoon</h1><p>Run a small campus shop for five days.</p></div>', unsafe_allow_html=True)
 
 # Before signing in: only a short welcome and the sign-in button, no game data.
 if not st.user.is_logged_in:
-    st.title("Campus Tycoon")
+    show_hero()
     st.write("Welcome! Run a small campus shop for five days. Sign in to play.")
     if st.button("Sign in with Google", type="primary"):
         st.login()
@@ -27,17 +91,11 @@ except ValueError as error:
         st.logout()
     st.stop()
 
-col1, col2, col3 = st.columns([6, 3, 1], vertical_alignment="center")
+show_hero()
+col1, col2 = st.columns([12, 1], vertical_alignment="center")
 with col1:
-    st.title("Campus Tycoon")
-    st.caption("Run a small campus shop for five days.")
+    st.caption(f"Signed in as {PLAYER}")
 with col2:
-    st.markdown(
-        f"<div style='text-align: right; color: inherit; font-size: 0.875rem;'>"
-        f"Signed in as {PLAYER}</div>",
-        unsafe_allow_html=True,
-    )
-with col3:
     if st.button("Sign out"):
         st.logout()
 
@@ -57,7 +115,11 @@ else:
 col3.metric("Loan to repay", f"€{game['debt']:.2f}")
 st.caption(f"Level: {logic.level_name(game)} (started with €{game['start_cash']:.2f})")
 
-practice_tab, tournament_tab, help_tab = st.tabs(["Practice", "Tournaments", "How to play"])
+practice_tab, tournament_tab, help_tab = st.tabs([
+    ":material/storefront: Practice",
+    ":material/emoji_events: Tournaments",
+    ":material/help: How to play",
+])
 
 with practice_tab:
 
@@ -78,7 +140,7 @@ with practice_tab:
             st.warning("We could not send the email, but your result is saved.")
 
     if not run_complete:
-        st.subheader("AI business advisor")
+      with st.expander("AI business advisor"):
         if st.button("Ask the advisor"):
             api_key = st.secrets.get("OPENROUTER_API_KEY", "")
             advice = logic.get_advice(
@@ -98,99 +160,103 @@ with practice_tab:
                 ]
             )
 
-    st.subheader("New run")
-    new_level = st.selectbox(
-        "Difficulty",
-        list(logic.DIFFICULTY_LEVELS),
-        index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
-        format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
-        key="new_run_level",
-    )
-    if not st.session_state.get("confirm_new_run"):
-        if st.button("Start a new run"):
-            st.session_state["confirm_new_run"] = True
-            st.rerun()
-    else:
-        st.warning(f"Start a new {new_level} run? The current run and its history will be lost.")
-        col1, col2 = st.columns(2)
-        if col1.button("Yes, start a new run"):
-            try:
-                logic.new_run(DB_PATH, PLAYER, new_level)
+    with st.expander("New run", expanded=run_complete):
+        new_level = st.selectbox(
+            "Difficulty",
+            list(logic.DIFFICULTY_LEVELS),
+            index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
+            format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
+            key="new_run_level",
+        )
+        if not st.session_state.get("confirm_new_run"):
+            if st.button("Start a new run"):
+                st.session_state["confirm_new_run"] = True
+                st.rerun()
+        else:
+            st.warning(f"Start a new {new_level} run? The current run and its history will be lost.")
+            col1, col2 = st.columns(2)
+            if col1.button("Yes, start a new run"):
+                try:
+                    logic.new_run(DB_PATH, PLAYER, new_level)
+                    st.session_state["confirm_new_run"] = False
+                    st.rerun()
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    st.error(str(error))
+            if col2.button("Cancel"):
                 st.session_state["confirm_new_run"] = False
                 st.rerun()
-            except (ValueError, db.DatabaseUnavailable) as error:
-                st.error(str(error))
-        if col2.button("Cancel"):
-            st.session_state["confirm_new_run"] = False
-            st.rerun()
 
-    st.subheader("Products")
+    st.markdown(f"{icon('cart')} Products", unsafe_allow_html=True)
     if not run_complete:
         preview = logic.demand_preview(game)
 
-    product_rows = []
-    for name, details in logic.PRODUCTS.items():
-        row = {
-            "Product": name,
-            "Stock": game["stock"][name],
-            "Price": f"€{game['price'][name]:.2f}",
-            "Unit cost": f"€{details['unit_cost']:.2f}",
-            "Reference price": f"€{details['reference_price']:.2f}",
-        }
-        if not run_complete:
-            row["Demand at this price"] = preview[name]["demand"]
-            row["Will sell"] = preview[name]["will_sell"]
-        product_rows.append(row)
-    st.table(product_rows)
+    icons = {"Café": "coffee", "Croissant": "croissant", "Water": "droplet"}
+    product_columns = st.columns(3)
+    for index, (name, details) in enumerate(logic.PRODUCTS.items()):
+        with product_columns[index % 3]:
+            with st.container(border=True):
+                st.markdown(f"{icon(icons.get(name, 'box'))} {name}", unsafe_allow_html=True)
+                st.write(f"Stock: {game['stock'][name]}")
+                st.write(f"Price: €{game['price'][name]:.2f}")
+                if not run_complete:
+                    st.write(f"Demand: {preview[name]['demand']}")
+                    st.write(f"Will sell: {preview[name]['will_sell']}")
+                st.caption(f"Unit cost: €{details['unit_cost']:.2f} · Reference price: €{details['reference_price']:.2f}")
     st.caption(
         "Demand per product per day: 10 units at or below its reference price, "
         "5 units up to twice the reference price, 0 units above that."
     )
 
-    st.subheader("Selling price")
-    price_product = st.selectbox("Product", list(logic.PRODUCTS), key="price_product")
-    new_price = st.number_input(
-        "Price (€)", step=0.01, value=game["price"][price_product], format="%.2f",
-        key=f"price_{price_product}",
-    )
-    if st.button("Set price"):
-        try:
-            logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
-            st.rerun()
-        except (ValueError, db.DatabaseUnavailable) as error:
-            st.error(str(error))
+    action_columns = st.columns(3)
+    with action_columns[0]:
+      with st.container(border=True):
+        st.markdown(f"{icon('trending-up')} Selling price", unsafe_allow_html=True)
+        price_product = st.selectbox("Product", list(logic.PRODUCTS), key="price_product")
+        new_price = st.number_input(
+            "Price (€)", step=0.01, value=game["price"][price_product], format="%.2f",
+            key=f"price_{price_product}",
+        )
+        if st.button("Set price", use_container_width=True):
+            try:
+                logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
+                st.rerun()
+            except (ValueError, db.DatabaseUnavailable) as error:
+                st.error(str(error))
 
-    st.subheader("Loan")
-    st.caption(
-        f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
-        f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
-    )
-    has_loan = game["debt"] > 0
-    loan_amount = st.number_input(
-        "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
-        key="loan_amount",
-    )
-    st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
-    if st.button("Take loan", disabled=run_complete or has_loan):
-        try:
-            logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
-            st.rerun()
-        except (ValueError, db.DatabaseUnavailable) as error:
-            st.error(str(error))
+    with action_columns[1]:
+      with st.container(border=True):
+        st.markdown(f"{icon('wallet')} Loan", unsafe_allow_html=True)
+        st.caption(
+            f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
+            f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
+        )
+        has_loan = game["debt"] > 0
+        loan_amount = st.number_input(
+            "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
+            key="loan_amount",
+        )
+        st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
+        if st.button("Take loan", disabled=run_complete or has_loan, use_container_width=True):
+            try:
+                logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
+                st.rerun()
+            except (ValueError, db.DatabaseUnavailable) as error:
+                st.error(str(error))
 
-    st.subheader("Buy")
-    buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
-    quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
-    st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
-    if st.button("Buy", disabled=run_complete):
-        try:
-            logic.buy(DB_PATH, PLAYER, buy_product, int(quantity))
-            st.rerun()
-        except (ValueError, db.DatabaseUnavailable) as error:
-            st.error(str(error))
+    with action_columns[2]:
+      with st.container(border=True):
+        st.markdown(f"{icon('cart')} Buy", unsafe_allow_html=True)
+        buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
+        quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
+        st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
+        if st.button("Buy", disabled=run_complete, use_container_width=True, icon=":material/shopping_cart:"):
+            try:
+                logic.buy(DB_PATH, PLAYER, buy_product, int(quantity))
+                st.rerun()
+            except (ValueError, db.DatabaseUnavailable) as error:
+                st.error(str(error))
 
-    st.subheader("Trade")
-    if st.button("Trade one day", disabled=run_complete):
+    if st.button("Trade one day", disabled=run_complete, type="primary", use_container_width=True, icon=":material/play_arrow:"):
         try:
             logic.trade_day(DB_PATH, PLAYER)
             game = logic.load_game(DB_PATH, PLAYER)
@@ -203,7 +269,7 @@ with practice_tab:
         except (ValueError, db.DatabaseUnavailable) as error:
             st.error(str(error))
 
-    st.subheader("Results")
+    st.markdown(f"{icon('trending-up')} Results", unsafe_allow_html=True)
     try:
         results = logic.get_results(DB_PATH, PLAYER)
     except db.DatabaseUnavailable as error:
@@ -214,31 +280,34 @@ with practice_tab:
     chart_data = logic.profit_chart_data(results)
     if chart_data["Day"]:
         st.write("Gross profit per day by product")
-        st.bar_chart(
-            chart_data, x="Day", y=list(logic.PRODUCTS), stack=False,
-            x_label="Day", y_label="Gross profit (€)",
-        )
-        st.write("Total gross profit per day")
-        st.line_chart(
-            chart_data, x="Day", y="Total", x_label="Day", y_label="Gross profit (€)",
-        )
+        chart_col1, chart_col2 = st.columns(2)
+        with chart_col1:
+            st.bar_chart(
+                chart_data, x="Day", y=list(logic.PRODUCTS), stack=False,
+                x_label="Day", y_label="Gross profit (€)",
+            )
+        with chart_col2:
+            st.write("Total gross profit per day")
+            st.line_chart(
+                chart_data, x="Day", y="Total", x_label="Day", y_label="Gross profit (€)",
+            )
     else:
         st.info("Trade a day to see your charts.")
 
     for result in results:
-        st.write(f"Day {result['day']}")
-        rows = []
-        for name, line in list(result["by_product"].items()) + [("Total", result["total"])]:
-            rows.append(
-                {
-                    "Product": name,
-                    "Units sold": line["units_sold"],
-                    "Revenue": f"€{line['revenue']:.2f}",
-                    "COGS": f"€{line['cogs']:.2f}",
-                    "Gross profit": f"€{line['gross_profit']:.2f}",
-                }
-            )
-        st.table(rows)
+        with st.expander(f"Day {result['day']}"):
+            rows = []
+            for name, line in list(result["by_product"].items()) + [("Total", result["total"])]:
+                rows.append(
+                    {
+                        "Product": name,
+                        "Units sold": line["units_sold"],
+                        "Revenue": f"€{line['revenue']:.2f}",
+                        "COGS": f"€{line['cogs']:.2f}",
+                        "Gross profit": f"€{line['gross_profit']:.2f}",
+                    }
+                )
+            st.table(rows)
 
     if run_complete:
         st.download_button(
@@ -246,10 +315,8 @@ with practice_tab:
             data=logic.build_run_report_csv(results).encode("utf-8-sig"),
             file_name="run_report.csv",
             mime="text/csv",
+            type="primary",
         )
-
-    st.subheader("Tournaments")
-
 
 def show_closed_day(closed_day, player):
     st.success(f"Day {closed_day['day']} closed.")
@@ -353,7 +420,7 @@ def show_tournament(stand, player):
             except (ValueError, db.DatabaseUnavailable) as error:
                 st.error(str(error))
 
-            if st.button("Ready", key=f"tournament_ready_{tournament_id}"):
+            if st.button("Ready", key=f"tournament_ready_{tournament_id}", icon=":material/check:"):
                 try:
                     result = logic.ready_tournament(DB_PATH, player, tournament_id)
                     action_message = "You are Ready."
@@ -438,7 +505,7 @@ def show_tournament(stand, player):
         st.info("You are Ready. Waiting for the other players.")
 
 with tournament_tab:
-    st.write("Create a tournament")
+    st.markdown(f"{icon('trophy')} Create a tournament", unsafe_allow_html=True)
     tournament_name = st.text_input("Tournament name", key="tournament_name")
     if st.button("Create tournament"):
         try:
@@ -457,7 +524,7 @@ with tournament_tab:
     if joined_message:
         st.success(joined_message)
 
-    st.write("Join a tournament")
+    st.markdown(f"{icon('users')} Join a tournament", unsafe_allow_html=True)
     join_code = st.text_input("Join code", key="tournament_join_code")
     if st.button("Join tournament"):
         try:
