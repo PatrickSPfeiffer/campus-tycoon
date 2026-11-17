@@ -8,12 +8,13 @@ import weather
 
 DB_PATH = db.DEFAULT_PATH
 
-st.title("Campus Tycoon")
+st.set_page_config(page_title="Campus Tycoon", page_icon="☕", layout="wide")
 
 # Before signing in: only a short welcome and the sign-in button, no game data.
 if not st.user.is_logged_in:
+    st.title("Campus Tycoon")
     st.write("Welcome! Run a small campus shop for five days. Sign in to play.")
-    if st.button("Sign in with Google"):
+    if st.button("Sign in with Google", type="primary"):
         st.login()
     st.stop()
 
@@ -26,10 +27,19 @@ except ValueError as error:
         st.logout()
     st.stop()
 
-col1, col2 = st.columns([3, 1])
-col1.caption(f"Signed in as {PLAYER}")
-if col2.button("Sign out"):
-    st.logout()
+col1, col2, col3 = st.columns([6, 3, 1], vertical_alignment="center")
+with col1:
+    st.title("Campus Tycoon")
+    st.caption("Run a small campus shop for five days.")
+with col2:
+    st.markdown(
+        f"<div style='text-align: right; color: inherit; font-size: 0.875rem;'>"
+        f"Signed in as {PLAYER}</div>",
+        unsafe_allow_html=True,
+    )
+with col3:
+    if st.button("Sign out"):
+        st.logout()
 
 try:
     game = logic.load_game(DB_PATH, PLAYER)
@@ -47,194 +57,198 @@ else:
 col3.metric("Loan to repay", f"€{game['debt']:.2f}")
 st.caption(f"Level: {logic.level_name(game)} (started with €{game['start_cash']:.2f})")
 
-if run_complete:
-    final = logic.final_result(game)
-    st.subheader("Final result")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Final cash", f"€{final['final_cash']:.2f}")
-    col2.metric("Remaining stock at cost", f"€{final['stock_at_cost']:.2f}")
-    col3.metric("Loan to repay", f"€{game['debt']:.2f}")
-    col4.metric("Overall gain or loss", f"€{final['gain']:.2f}")
-    email_status = st.session_state.pop("email_status", None)
-    if email_status == "sent":
-        st.success(f"Your result was emailed to {PLAYER}.")
-    elif email_status == "skipped":
-        st.info("Result email is not configured, so no email was sent.")
-    elif email_status == "failed":
-        st.warning("We could not send the email, but your result is saved.")
+practice_tab, tournament_tab, help_tab = st.tabs(["Practice", "Tournaments", "How to play"])
 
-if not run_complete:
-    st.subheader("AI business advisor")
-    if st.button("Ask the advisor"):
-        api_key = st.secrets.get("OPENROUTER_API_KEY", "")
-        advice = logic.get_advice(
-            game,
-            lambda prompt: advisor.ask_openrouter(prompt, api_key),
-        )
-        label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
-        st.write(label)
-        st.table(
-            [
-                {
-                    "Product": product,
-                    "Price": f"€{line['price']:.2f}",
-                    "Reason": line["reason"],
-                }
-                for product, line in advice["prices"].items()
-            ]
-        )
+with practice_tab:
 
-st.subheader("New run")
-new_level = st.selectbox(
-    "Difficulty",
-    list(logic.DIFFICULTY_LEVELS),
-    index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
-    format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
-    key="new_run_level",
-)
-if not st.session_state.get("confirm_new_run"):
-    if st.button("Start a new run"):
-        st.session_state["confirm_new_run"] = True
-        st.rerun()
-else:
-    st.warning(f"Start a new {new_level} run? The current run and its history will be lost.")
-    col1, col2 = st.columns(2)
-    if col1.button("Yes, start a new run"):
-        try:
-            logic.new_run(DB_PATH, PLAYER, new_level)
+    if run_complete:
+        final = logic.final_result(game)
+        st.subheader("Final result")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Final cash", f"€{final['final_cash']:.2f}")
+        col2.metric("Remaining stock at cost", f"€{final['stock_at_cost']:.2f}")
+        col3.metric("Loan to repay", f"€{game['debt']:.2f}")
+        col4.metric("Overall gain or loss", f"€{final['gain']:.2f}")
+        email_status = st.session_state.pop("email_status", None)
+        if email_status == "sent":
+            st.success(f"Your result was emailed to {PLAYER}.")
+        elif email_status == "skipped":
+            st.info("Result email is not configured, so no email was sent.")
+        elif email_status == "failed":
+            st.warning("We could not send the email, but your result is saved.")
+
+    if not run_complete:
+        st.subheader("AI business advisor")
+        if st.button("Ask the advisor"):
+            api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+            advice = logic.get_advice(
+                game,
+                lambda prompt: advisor.ask_openrouter(prompt, api_key),
+            )
+            label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
+            st.write(label)
+            st.table(
+                [
+                    {
+                        "Product": product,
+                        "Price": f"€{line['price']:.2f}",
+                        "Reason": line["reason"],
+                    }
+                    for product, line in advice["prices"].items()
+                ]
+            )
+
+    st.subheader("New run")
+    new_level = st.selectbox(
+        "Difficulty",
+        list(logic.DIFFICULTY_LEVELS),
+        index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
+        format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
+        key="new_run_level",
+    )
+    if not st.session_state.get("confirm_new_run"):
+        if st.button("Start a new run"):
+            st.session_state["confirm_new_run"] = True
+            st.rerun()
+    else:
+        st.warning(f"Start a new {new_level} run? The current run and its history will be lost.")
+        col1, col2 = st.columns(2)
+        if col1.button("Yes, start a new run"):
+            try:
+                logic.new_run(DB_PATH, PLAYER, new_level)
+                st.session_state["confirm_new_run"] = False
+                st.rerun()
+            except (ValueError, db.DatabaseUnavailable) as error:
+                st.error(str(error))
+        if col2.button("Cancel"):
             st.session_state["confirm_new_run"] = False
+            st.rerun()
+
+    st.subheader("Products")
+    if not run_complete:
+        preview = logic.demand_preview(game)
+
+    product_rows = []
+    for name, details in logic.PRODUCTS.items():
+        row = {
+            "Product": name,
+            "Stock": game["stock"][name],
+            "Price": f"€{game['price'][name]:.2f}",
+            "Unit cost": f"€{details['unit_cost']:.2f}",
+            "Reference price": f"€{details['reference_price']:.2f}",
+        }
+        if not run_complete:
+            row["Demand at this price"] = preview[name]["demand"]
+            row["Will sell"] = preview[name]["will_sell"]
+        product_rows.append(row)
+    st.table(product_rows)
+    st.caption(
+        "Demand per product per day: 10 units at or below its reference price, "
+        "5 units up to twice the reference price, 0 units above that."
+    )
+
+    st.subheader("Selling price")
+    price_product = st.selectbox("Product", list(logic.PRODUCTS), key="price_product")
+    new_price = st.number_input(
+        "Price (€)", step=0.01, value=game["price"][price_product], format="%.2f",
+        key=f"price_{price_product}",
+    )
+    if st.button("Set price"):
+        try:
+            logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
             st.rerun()
         except (ValueError, db.DatabaseUnavailable) as error:
             st.error(str(error))
-    if col2.button("Cancel"):
-        st.session_state["confirm_new_run"] = False
-        st.rerun()
 
-st.subheader("Products")
-if not run_complete:
-    preview = logic.demand_preview(game)
-
-product_rows = []
-for name, details in logic.PRODUCTS.items():
-    row = {
-        "Product": name,
-        "Stock": game["stock"][name],
-        "Price": f"€{game['price'][name]:.2f}",
-        "Unit cost": f"€{details['unit_cost']:.2f}",
-        "Reference price": f"€{details['reference_price']:.2f}",
-    }
-    if not run_complete:
-        row["Demand at this price"] = preview[name]["demand"]
-        row["Will sell"] = preview[name]["will_sell"]
-    product_rows.append(row)
-st.table(product_rows)
-st.caption(
-    "Demand per product per day: 10 units at or below its reference price, "
-    "5 units up to twice the reference price, 0 units above that."
-)
-
-st.subheader("Selling price")
-price_product = st.selectbox("Product", list(logic.PRODUCTS), key="price_product")
-new_price = st.number_input(
-    "Price (€)", step=0.01, value=game["price"][price_product], format="%.2f",
-    key=f"price_{price_product}",
-)
-if st.button("Set price"):
-    try:
-        logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
-        st.rerun()
-    except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
-
-st.subheader("Loan")
-st.caption(
-    f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
-    f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
-)
-has_loan = game["debt"] > 0
-loan_amount = st.number_input(
-    "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
-    key="loan_amount",
-)
-st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
-if st.button("Take loan", disabled=run_complete or has_loan):
-    try:
-        logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
-        st.rerun()
-    except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
-
-st.subheader("Buy")
-buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
-quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
-st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
-if st.button("Buy", disabled=run_complete):
-    try:
-        logic.buy(DB_PATH, PLAYER, buy_product, int(quantity))
-        st.rerun()
-    except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
-
-st.subheader("Trade")
-if st.button("Trade one day", disabled=run_complete):
-    try:
-        logic.trade_day(DB_PATH, PLAYER)
-        game = logic.load_game(DB_PATH, PLAYER)
-        if logic.is_run_complete(game):
-            with st.spinner("Sending your result by email..."):
-                st.session_state["email_status"] = mailer.send_result_email(
-                    PLAYER, logic.final_result(game)
-                )
-        st.rerun()
-    except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
-
-st.subheader("Results")
-try:
-    results = logic.get_results(DB_PATH, PLAYER)
-except db.DatabaseUnavailable as error:
-    st.error(str(error))
-    results = []
-
-# History charts: built only from this player's own saved results.
-chart_data = logic.profit_chart_data(results)
-if chart_data["Day"]:
-    st.write("Gross profit per day by product")
-    st.bar_chart(
-        chart_data, x="Day", y=list(logic.PRODUCTS), stack=False,
-        x_label="Day", y_label="Gross profit (€)",
+    st.subheader("Loan")
+    st.caption(
+        f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
+        f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
     )
-    st.write("Total gross profit per day")
-    st.line_chart(
-        chart_data, x="Day", y="Total", x_label="Day", y_label="Gross profit (€)",
+    has_loan = game["debt"] > 0
+    loan_amount = st.number_input(
+        "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
+        key="loan_amount",
     )
-else:
-    st.info("Trade a day to see your charts.")
+    st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
+    if st.button("Take loan", disabled=run_complete or has_loan):
+        try:
+            logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
+            st.rerun()
+        except (ValueError, db.DatabaseUnavailable) as error:
+            st.error(str(error))
 
-for result in results:
-    st.write(f"Day {result['day']}")
-    rows = []
-    for name, line in list(result["by_product"].items()) + [("Total", result["total"])]:
-        rows.append(
-            {
-                "Product": name,
-                "Units sold": line["units_sold"],
-                "Revenue": f"€{line['revenue']:.2f}",
-                "COGS": f"€{line['cogs']:.2f}",
-                "Gross profit": f"€{line['gross_profit']:.2f}",
-            }
+    st.subheader("Buy")
+    buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
+    quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
+    st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
+    if st.button("Buy", disabled=run_complete):
+        try:
+            logic.buy(DB_PATH, PLAYER, buy_product, int(quantity))
+            st.rerun()
+        except (ValueError, db.DatabaseUnavailable) as error:
+            st.error(str(error))
+
+    st.subheader("Trade")
+    if st.button("Trade one day", disabled=run_complete):
+        try:
+            logic.trade_day(DB_PATH, PLAYER)
+            game = logic.load_game(DB_PATH, PLAYER)
+            if logic.is_run_complete(game):
+                with st.spinner("Sending your result by email..."):
+                    st.session_state["email_status"] = mailer.send_result_email(
+                        PLAYER, logic.final_result(game)
+                    )
+            st.rerun()
+        except (ValueError, db.DatabaseUnavailable) as error:
+            st.error(str(error))
+
+    st.subheader("Results")
+    try:
+        results = logic.get_results(DB_PATH, PLAYER)
+    except db.DatabaseUnavailable as error:
+        st.error(str(error))
+        results = []
+
+    # History charts: built only from this player's own saved results.
+    chart_data = logic.profit_chart_data(results)
+    if chart_data["Day"]:
+        st.write("Gross profit per day by product")
+        st.bar_chart(
+            chart_data, x="Day", y=list(logic.PRODUCTS), stack=False,
+            x_label="Day", y_label="Gross profit (€)",
         )
-    st.table(rows)
+        st.write("Total gross profit per day")
+        st.line_chart(
+            chart_data, x="Day", y="Total", x_label="Day", y_label="Gross profit (€)",
+        )
+    else:
+        st.info("Trade a day to see your charts.")
 
-if run_complete:
-    st.download_button(
-        "Download run report (CSV)",
-        data=logic.build_run_report_csv(results).encode("utf-8-sig"),
-        file_name="run_report.csv",
-        mime="text/csv",
-    )
+    for result in results:
+        st.write(f"Day {result['day']}")
+        rows = []
+        for name, line in list(result["by_product"].items()) + [("Total", result["total"])]:
+            rows.append(
+                {
+                    "Product": name,
+                    "Units sold": line["units_sold"],
+                    "Revenue": f"€{line['revenue']:.2f}",
+                    "COGS": f"€{line['cogs']:.2f}",
+                    "Gross profit": f"€{line['gross_profit']:.2f}",
+                }
+            )
+        st.table(rows)
 
-st.subheader("Tournaments")
+    if run_complete:
+        st.download_button(
+            "Download run report (CSV)",
+            data=logic.build_run_report_csv(results).encode("utf-8-sig"),
+            file_name="run_report.csv",
+            mime="text/csv",
+        )
+
+    st.subheader("Tournaments")
 
 
 def show_closed_day(closed_day, player):
@@ -423,44 +437,69 @@ def show_tournament(stand, player):
     if own_player and own_player["ready"]:
         st.info("You are Ready. Waiting for the other players.")
 
-st.write("Create a tournament")
-tournament_name = st.text_input("Tournament name", key="tournament_name")
-if st.button("Create tournament"):
+with tournament_tab:
+    st.write("Create a tournament")
+    tournament_name = st.text_input("Tournament name", key="tournament_name")
+    if st.button("Create tournament"):
+        try:
+            created = logic.create_tournament(DB_PATH, PLAYER, tournament_name)
+            st.session_state["created_tournament"] = created
+            st.rerun()
+        except (ValueError, db.DatabaseUnavailable) as error:
+            st.error(str(error))
+
+    created = st.session_state.get("created_tournament")
+    if created:
+        st.success(f"Tournament created: {created['name']}")
+        st.subheader(f"Join code: {created['code']}")
+
+    joined_message = st.session_state.pop("joined_message", None)
+    if joined_message:
+        st.success(joined_message)
+
+    st.write("Join a tournament")
+    join_code = st.text_input("Join code", key="tournament_join_code")
+    if st.button("Join tournament"):
+        try:
+            joined = logic.join_tournament(DB_PATH, PLAYER, join_code)
+            st.session_state["joined_message"] = (
+                f"Joined {joined['name']} in seat {joined['seat']}."
+            )
+            st.rerun()
+        except (ValueError, db.DatabaseUnavailable) as error:
+            st.error(str(error))
+
     try:
-        created = logic.create_tournament(DB_PATH, PLAYER, tournament_name)
-        st.session_state["created_tournament"] = created
-        st.rerun()
+        my_stands = logic.get_my_stands(DB_PATH, PLAYER)
     except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
+        my_stands = []
 
-created = st.session_state.get("created_tournament")
-if created:
-    st.success(f"Tournament created: {created['name']}")
-    st.subheader(f"Join code: {created['code']}")
+    if my_stands:
+        st.write("My tournament stands")
+        for stand in my_stands:
+            show_tournament(stand, PLAYER)
 
-joined_message = st.session_state.pop("joined_message", None)
-if joined_message:
-    st.success(joined_message)
 
-st.write("Join a tournament")
-join_code = st.text_input("Join code", key="tournament_join_code")
-if st.button("Join tournament"):
-    try:
-        joined = logic.join_tournament(DB_PATH, PLAYER, join_code)
-        st.session_state["joined_message"] = (
-            f"Joined {joined['name']} in seat {joined['seat']}."
-        )
-        st.rerun()
-    except (ValueError, db.DatabaseUnavailable) as error:
-        st.error(str(error))
-
-try:
-    my_stands = logic.get_my_stands(DB_PATH, PLAYER)
-except (ValueError, db.DatabaseUnavailable) as error:
-    st.error(str(error))
-    my_stands = []
-
-if my_stands:
-    st.write("My tournament stands")
-    for stand in my_stands:
-        show_tournament(stand, PLAYER)
+with help_tab:
+    st.subheader("Goal")
+    st.write("Finish five days with the highest gain.")
+    st.subheader("Each day")
+    st.write("Buy stock, set prices, then trade one day.")
+    st.subheader("Demand")
+    st.write(
+        "Demand per product per day: 10 units at or below its reference price, "
+        "5 units up to twice the reference price, 0 units above that."
+    )
+    st.subheader("Loan")
+    st.write(
+        f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
+        f"{logic.LOAN_INTEREST:.0%} interest, which is subtracted from your final gain."
+    )
+    st.subheader("Tournaments")
+    upgrade_cost = next(details["cost"] for details in logic.UPGRADES.values())
+    st.write(
+        "Join with a code to play in a shared market. The cheapest price sells first. "
+        "Players use Ready and the organiser can Close day. Weather comes from Lisbon. "
+        f"You can buy a Coffee machine upgrade for €{upgrade_cost:.2f}."
+    )
