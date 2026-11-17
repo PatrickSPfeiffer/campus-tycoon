@@ -4,3 +4,11 @@
 # Never show tracebacks (file paths, code) to players on the public app.
 # Errors still appear in the terminal / Streamlit Cloud logs for the team.
 showErrorDetails = "none"
+
+[theme]
+base = "light"
+primaryColor = "#8B4A1F"
+backgroundColor = "#FBF3E4"
+secondaryBackgroundColor = "#F1E2C8"
+textColor = "#2E1F14"
+font = "sans serif"
