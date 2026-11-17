@@ -6,6 +6,7 @@ The app works but looks like a prototype: white default background, one long nar
 ## What
 Only the look and the screen layout change. The rules and the data do not change.
 1. Look: a warm cafe theme set in .streamlit/config.toml (cream background, coffee brown accent, readable text), keeping the existing showErrorDetails line unchanged. Page title, icon and wide layout set with st.set_page_config as the first Streamlit call in app.py.
+1b. Design: a coffee-brown gradient banner with the app name; status numbers as rounded cards with a soft shadow; products as cards with an icon; main buttons large and filled, secondary buttons small; tabs styled as pills. Created with the theme plus the one CSS block.
 2. Header: app name, short tagline, signed-in player and Sign out button in one aligned row.
 3. Navigation: three tabs: Practice, Tournaments, How to play. No more single long page.
 4. Practice tab: status numbers (Cash, Progress, Loan) in a bordered card; actions (price, loan, buy) in bordered cards side by side; products table next to or above them; "Trade one day" is the main button, full width, placed right after the actions. Results (charts and day tables) in their own area below; new run, advisor and report download grouped and clearly secondary.
@@ -17,7 +18,7 @@ Only the look and the screen layout change. The rules and the data do not change
 
 ## Out of scope
 - Any change to logic.py, db.py, the tables or the game rules.
-- New game features, new libraries, custom JavaScript or full custom CSS frameworks. (A few lines of st.markdown CSS are allowed only if the theme cannot do it.)
+- Custom JavaScript, new libraries, or a CSS framework. One single small CSS block (st.markdown inside one function in app.py) is allowed for the banner, cards and buttons that the theme cannot style.
 - Live updates without refresh; chat; extra products.
 - Changing, editing or skipping any existing test.
 
@@ -35,4 +36,4 @@ Signed out; practice start; practice after buying; day result; end of run; advis
 1. Look: theme, page config, header, tabs, How to play skeleton.
 2. Screens: Practice and Tournaments layout, cards, buttons, positions.
 3. Messages and errors, small fixes, polish, test on the deployed app.
-Status: step 1 in progress.
+Status: step 1 merged; step 2 in progress.
