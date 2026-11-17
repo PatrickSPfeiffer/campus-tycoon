@@ -36,4 +36,4 @@ Signed out; practice start; practice after buying; day result; end of run; advis
 1. Look: theme, page config, header, tabs, How to play skeleton.
 2. Screens: Practice and Tournaments layout, cards, buttons, positions.
 3. Messages and errors, small fixes, polish, test on the deployed app.
-Status: step 1 merged; step 2 in progress.
+Status: step 1 merged; step 2 in progress (design system done, tournaments in progress)

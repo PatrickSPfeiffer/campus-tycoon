@@ -2,6 +2,7 @@ import streamlit as st
 
 import advisor
 import db
+import html
 import logic
 import mailer
 import weather
@@ -52,14 +53,22 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 .stButton button:not([kind="primary"]):hover, .stDownloadButton button:not([kind="primary"]):hover { border-color:var(--amber); color:var(--amber); }
 input, textarea, [data-baseweb="select"] > div { border-radius:12px !important; background:var(--card) !important; }
 [data-testid="stTabs"] [data-baseweb="tab-list"] { gap:8px; }
-[data-testid="stTabs"] [data-baseweb="tab-highlight"], [data-testid="stTabs"] [data-baseweb="tab-border"] { display:none; }
+[data-testid="stTabs"] [data-baseweb="tab-highlight"], [data-testid="stTabs"] [data-baseweb="tab-border"], [data-testid="stTabs"] [data-baseweb="tab-list"]::after, [data-testid="stTabs"] [data-testid="stTab"]::after { display:none !important; }
 [data-testid="stTabs"] [data-testid="stTab"], [data-testid="stTabs"] [role="tab"] { border-radius:999px; padding:8px 20px; background:var(--card); border:1px solid transparent; }
 [data-testid="stTabs"] [role="tab"][aria-selected="true"] { background:linear-gradient(135deg,var(--amber),var(--orange)); color:#2B1608; }
 [data-testid="stMetricValue"] { color:var(--text); font-size:2rem; font-weight:800; }
 [data-testid="stMetricLabel"] { color:var(--muted); }
-.hero { background:linear-gradient(135deg,rgba(245,165,36,.18),rgba(255,122,24,.10)),var(--card); border:1px solid rgba(245,165,36,.28); border-radius:24px; padding:28px 32px; margin-bottom:12px; box-shadow:0 0 40px rgba(194,65,12,.12); backdrop-filter:blur(12px); }
-.hero h1 { background:linear-gradient(90deg,var(--amber),var(--orange)); background-clip:text; -webkit-background-clip:text; color:transparent; font-size:2.7rem; font-weight:800; margin:0; }
-.hero p { color:var(--muted); font-size:1rem; margin:4px 0 0; }
+.hero { background:linear-gradient(135deg,rgba(245,165,36,.18),rgba(255,122,24,.10)),var(--card); border:1px solid rgba(245,165,36,.28); border-radius:24px; padding:28px 32px; margin-bottom:12px; box-shadow:0 0 40px rgba(194,65,12,.12); backdrop-filter:blur(12px); text-align:center; }
+.hero h1 { background:linear-gradient(90deg,var(--amber),var(--orange)); background-clip:text; -webkit-background-clip:text; color:transparent; font-size:3rem; font-weight:800; margin:0; }
+.hero p { color:var(--muted); font-size:1.25rem; margin:4px 0 0; }
+.hero .app-icon { vertical-align:baseline; }
+.section-heading { color:var(--amber); font-size:1.35rem; font-weight:800; margin:.8rem 0 .5rem; }
+.stat-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.stat-box { background:rgba(255,255,255,.045); border:1px solid var(--card-border); border-radius:12px; padding:8px 10px; }
+.stat-label { color:var(--muted); font-size:.75rem; }
+.stat-value { color:var(--text); font-size:1.2rem; font-weight:800; }
+.weather-chip, .code-badge { display:inline-flex; gap:6px; align-items:center; padding:4px 10px; border-radius:999px; background:var(--card); border:1px solid var(--card-border); color:var(--muted); font-size:.8rem; }
+.mini-card { text-align:center; padding:12px 8px; background:var(--card); border:1px solid var(--card-border); border-radius:14px; }
 .app-icon { display:inline-flex; color:var(--amber); vertical-align:middle; flex:none; }
 .app-icon svg { width:100%; height:100%; }
 [data-testid="stDataFrame"], [data-testid="stTable"] { color:var(--text); }
@@ -76,10 +85,17 @@ def show_hero():
 
 # Before signing in: only a short welcome and the sign-in button, no game data.
 if not st.user.is_logged_in:
-    show_hero()
-    st.write("Welcome! Run a small campus shop for five days. Sign in to play.")
-    if st.button("Sign in with Google", type="primary"):
-        st.login()
+    st.markdown('<div style="height:10vh"></div>', unsafe_allow_html=True)
+    _, sign_in_column, _ = st.columns([1, 2, 1])
+    with sign_in_column:
+        show_hero()
+        st.markdown('<div style="text-align:center">Welcome! Run a small campus shop for five days. Sign in to play.</div>', unsafe_allow_html=True)
+        if st.button("Sign in with Google", type="primary", icon=":material/login:", use_container_width=True):
+            st.login()
+        mini_columns = st.columns(3)
+        for mini_column, glyph, caption in zip(mini_columns, ("cart", "trending-up", "trophy"), ("Buy stock", "Set prices", "Beat the market")):
+            with mini_column:
+                st.markdown(f'<div class="mini-card">{icon(glyph)}<br>{caption}</div>', unsafe_allow_html=True)
     st.stop()
 
 # The player is always the signed-in Google email, never typed in.
@@ -186,7 +202,7 @@ with practice_tab:
                 st.session_state["confirm_new_run"] = False
                 st.rerun()
 
-    st.markdown(f"{icon('cart')} Products", unsafe_allow_html=True)
+    st.markdown(f'<div class="section-heading">{icon("cart")} Products</div>', unsafe_allow_html=True)
     if not run_complete:
         preview = logic.demand_preview(game)
 
@@ -196,11 +212,11 @@ with practice_tab:
         with product_columns[index % 3]:
             with st.container(border=True):
                 st.markdown(f"{icon(icons.get(name, 'box'))} {name}", unsafe_allow_html=True)
-                st.write(f"Stock: {game['stock'][name]}")
-                st.write(f"Price: €{game['price'][name]:.2f}")
+                stat_items = [("Stock", game['stock'][name]), ("Price", f"€{game['price'][name]:.2f}")]
                 if not run_complete:
-                    st.write(f"Demand: {preview[name]['demand']}")
-                    st.write(f"Will sell: {preview[name]['will_sell']}")
+                    stat_items.extend([("Demand", preview[name]['demand']), ("Will sell", preview[name]['will_sell'])])
+                stat_html = ''.join(f'<div class="stat-box"><div class="stat-label">{label}</div><div class="stat-value">{value}</div></div>' for label, value in stat_items)
+                st.markdown(f'<div class="stat-grid">{stat_html}</div>', unsafe_allow_html=True)
                 st.caption(f"Unit cost: €{details['unit_cost']:.2f} · Reference price: €{details['reference_price']:.2f}")
     st.caption(
         "Demand per product per day: 10 units at or below its reference price, "
@@ -210,7 +226,7 @@ with practice_tab:
     action_columns = st.columns(3)
     with action_columns[0]:
       with st.container(border=True):
-        st.markdown(f"{icon('trending-up')} Selling price", unsafe_allow_html=True)
+        st.markdown(f'<div class="section-heading">{icon("trending-up")} Selling price</div>', unsafe_allow_html=True)
         price_product = st.selectbox("Product", list(logic.PRODUCTS), key="price_product")
         new_price = st.number_input(
             "Price (€)", step=0.01, value=game["price"][price_product], format="%.2f",
@@ -225,7 +241,7 @@ with practice_tab:
 
     with action_columns[1]:
       with st.container(border=True):
-        st.markdown(f"{icon('wallet')} Loan", unsafe_allow_html=True)
+        st.markdown(f'<div class="section-heading">{icon("wallet")} Loan</div>', unsafe_allow_html=True)
         st.caption(
             f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
             f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
@@ -245,7 +261,7 @@ with practice_tab:
 
     with action_columns[2]:
       with st.container(border=True):
-        st.markdown(f"{icon('cart')} Buy", unsafe_allow_html=True)
+        st.markdown(f'<div class="section-heading">{icon("cart")} Buy</div>', unsafe_allow_html=True)
         buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
         quantity = st.number_input("Quantity", min_value=1, step=1, value=1)
         st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
@@ -269,7 +285,7 @@ with practice_tab:
         except (ValueError, db.DatabaseUnavailable) as error:
             st.error(str(error))
 
-    st.markdown(f"{icon('trending-up')} Results", unsafe_allow_html=True)
+    st.markdown(f'<div class="section-heading">{icon("trending-up")} Results</div>', unsafe_allow_html=True)
     try:
         results = logic.get_results(DB_PATH, PLAYER)
     except db.DatabaseUnavailable as error:
@@ -319,23 +335,25 @@ with practice_tab:
         )
 
 def show_closed_day(closed_day, player):
-    st.success(f"Day {closed_day['day']} closed.")
-    own_sales = closed_day.get("by_player", {}).get(player)
-    if own_sales is not None:
-        st.table(
-            [
-                {
-                    "Product": product,
-                    "Units sold": line["units_sold"],
-                    "Revenue": f"€{line['revenue']:.2f}",
-                }
-                for product, line in own_sales.items()
-            ]
-        )
+    with st.container(border=True):
+        st.success(f"Day {closed_day['day']} closed.")
+        own_sales = closed_day.get("by_player", {}).get(player)
+        if own_sales is not None:
+            st.table(
+                [
+                    {
+                        "Product": product,
+                        "Units sold": line["units_sold"],
+                        "Revenue": f"€{line['revenue']:.2f}",
+                    }
+                    for product, line in own_sales.items()
+                ]
+            )
 
 
 def show_tournament(stand, player):
-    st.subheader(f"{stand['name']} — join code {stand['code']}")
+    with st.container(border=True):
+        st.markdown(f'<h3>{html.escape(str(stand["name"]))} <span class="code-badge">{html.escape(str(stand["code"]))}</span></h3>', unsafe_allow_html=True)
     tournament_id = stand["id"]
     try:
         today_weather = logic.tournament_weather(DB_PATH, tournament_id, weather.fetch_lisbon_weather)
@@ -345,7 +363,8 @@ def show_tournament(stand, player):
             weather_name = "hot"
         else:
             weather_name = "normal"
-        st.write(f"Today in Lisbon: {weather_name}")
+        weather_icon, weather_label = {"rain": ("cloud-rain", "Rain"), "hot": ("sun", "Hot"), "normal": ("cloud-sun", "Normal")}[weather_name]
+        st.markdown(f'<span class="weather-chip">{icon(weather_icon, 16)} {weather_label}</span>', unsafe_allow_html=True)
     except (ValueError, db.DatabaseUnavailable) as error:
         st.error(str(error))
         return
@@ -361,6 +380,12 @@ def show_tournament(stand, player):
     products = list(logic.PRODUCTS)
     own_player = next((row for row in status["players"] if row["player"] == player), None)
     is_ready = bool(own_player and own_player["ready"])
+
+    st.write("Tournament status")
+    metric_columns = st.columns(3)
+    metric_columns[0].metric("Day", f"Day {status['day']} of {logic.RUN_DAYS}")
+    metric_columns[1].metric("Cash", f"€{stand['cash']:.2f}")
+    metric_columns[2].metric("Players ready", f"{sum(1 for row in status['players'] if row['ready'])}/{len(status['players'])}")
 
     if status["day"] <= logic.RUN_DAYS:
         if not is_ready:
@@ -420,7 +445,7 @@ def show_tournament(stand, player):
             except (ValueError, db.DatabaseUnavailable) as error:
                 st.error(str(error))
 
-            if st.button("Ready", key=f"tournament_ready_{tournament_id}", icon=":material/check:"):
+            if st.button("Ready", key=f"tournament_ready_{tournament_id}", icon=":material/check:", type="primary", use_container_width=True):
                 try:
                     result = logic.ready_tournament(DB_PATH, player, tournament_id)
                     action_message = "You are Ready."
@@ -462,7 +487,7 @@ def show_tournament(stand, player):
             st.table(
                 [
                     {
-                        "Position": position,
+                        "Position": {1: "1st", 2: "2nd", 3: "3rd"}.get(position, position),
                         "Player": logic.player_name(row["player"]),
                         "Gain": f"€{row['gain']:.2f}",
                         "Final cash": f"€{row['final_cash']:.2f}",
@@ -505,15 +530,18 @@ def show_tournament(stand, player):
         st.info("You are Ready. Waiting for the other players.")
 
 with tournament_tab:
-    st.markdown(f"{icon('trophy')} Create a tournament", unsafe_allow_html=True)
-    tournament_name = st.text_input("Tournament name", key="tournament_name")
-    if st.button("Create tournament"):
-        try:
-            created = logic.create_tournament(DB_PATH, PLAYER, tournament_name)
-            st.session_state["created_tournament"] = created
-            st.rerun()
-        except (ValueError, db.DatabaseUnavailable) as error:
-            st.error(str(error))
+    create_column, join_column = st.columns(2)
+    with create_column:
+      with st.container(border=True):
+        st.markdown(f'<div class="section-heading">{icon("trophy")} Create a tournament</div>', unsafe_allow_html=True)
+        tournament_name = st.text_input("Tournament name", key="tournament_name")
+        if st.button("Create tournament", type="primary", use_container_width=True):
+            try:
+                created = logic.create_tournament(DB_PATH, PLAYER, tournament_name)
+                st.session_state["created_tournament"] = created
+                st.rerun()
+            except (ValueError, db.DatabaseUnavailable) as error:
+                st.error(str(error))
 
     created = st.session_state.get("created_tournament")
     if created:
@@ -524,17 +552,19 @@ with tournament_tab:
     if joined_message:
         st.success(joined_message)
 
-    st.markdown(f"{icon('users')} Join a tournament", unsafe_allow_html=True)
-    join_code = st.text_input("Join code", key="tournament_join_code")
-    if st.button("Join tournament"):
-        try:
-            joined = logic.join_tournament(DB_PATH, PLAYER, join_code)
-            st.session_state["joined_message"] = (
-                f"Joined {joined['name']} in seat {joined['seat']}."
-            )
-            st.rerun()
-        except (ValueError, db.DatabaseUnavailable) as error:
-            st.error(str(error))
+    with join_column:
+      with st.container(border=True):
+        st.markdown(f'<div class="section-heading">{icon("users")} Join a tournament</div>', unsafe_allow_html=True)
+        join_code = st.text_input("Join code", key="tournament_join_code")
+        if st.button("Join tournament", use_container_width=True):
+            try:
+                joined = logic.join_tournament(DB_PATH, PLAYER, join_code)
+                st.session_state["joined_message"] = (
+                    f"Joined {joined['name']} in seat {joined['seat']}."
+                )
+                st.rerun()
+            except (ValueError, db.DatabaseUnavailable) as error:
+                st.error(str(error))
 
     try:
         my_stands = logic.get_my_stands(DB_PATH, PLAYER)
@@ -543,30 +573,24 @@ with tournament_tab:
         my_stands = []
 
     if my_stands:
-        st.write("My tournament stands")
+        st.markdown(f'<div class="section-heading">{icon("trophy")} My tournament stands</div>', unsafe_allow_html=True)
         for stand in my_stands:
             show_tournament(stand, PLAYER)
 
 
 with help_tab:
-    st.subheader("Goal")
-    st.write("Finish five days with the highest gain.")
-    st.subheader("Each day")
-    st.write("Buy stock, set prices, then trade one day.")
-    st.subheader("Demand")
-    st.write(
-        "Demand per product per day: 10 units at or below its reference price, "
-        "5 units up to twice the reference price, 0 units above that."
-    )
-    st.subheader("Loan")
-    st.write(
-        f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
-        f"{logic.LOAN_INTEREST:.0%} interest, which is subtracted from your final gain."
-    )
-    st.subheader("Tournaments")
+    help_content = [
+        ("trophy", "Goal", "Finish five days with the highest gain."),
+        ("clock", "Each day", "Buy stock, set prices, then trade one day."),
+        ("trending-up", "Demand", "Demand per product per day: 10 units at or below its reference price, 5 units up to twice the reference price, 0 units above that."),
+        ("wallet", "Loan", f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with {logic.LOAN_INTEREST:.0%} interest, which is subtracted from your final gain."),
+    ]
     upgrade_cost = next(details["cost"] for details in logic.UPGRADES.values())
-    st.write(
-        "Join with a code to play in a shared market. The cheapest price sells first. "
-        "Players use Ready and the organiser can Close day. Weather comes from Lisbon. "
-        f"You can buy a Coffee machine upgrade for €{upgrade_cost:.2f}."
-    )
+    help_content.append(("users", "Tournaments", "Join with a code to play in a shared market. The cheapest price sells first. Players use Ready and the organiser can Close day. Weather comes from Lisbon. You can buy a Coffee machine upgrade for €" + f"{upgrade_cost:.2f}."))
+    help_columns = st.columns(2)
+    for index, (glyph, heading, body) in enumerate(help_content):
+        target = help_columns[index % 2] if index < 4 else st.container()
+        with target:
+            with st.container(border=True):
+                st.markdown(f'<div class="section-heading">{icon(glyph)} {heading}</div>', unsafe_allow_html=True)
+                st.write(body)
