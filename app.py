@@ -165,6 +165,11 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 .hero .app-icon { vertical-align:baseline; }
 .hero .app-icon { width:44px !important; height:44px !important; }
 .st-key-signed_in_row [data-testid="stButton"] button { white-space:nowrap; }
+.day-steps { margin:.6rem 0 .4rem; color:var(--muted); font-size:.95rem; }
+.day-steps b { display:inline-flex; align-items:center; justify-content:center; width:1.4rem; height:1.4rem; margin:0 .2rem; border-radius:50%; background:linear-gradient(135deg,var(--amber),var(--orange)); color:#2B1608; font-size:.8rem; }
+.hero-compact { padding:14px 24px; text-align:left; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
+.hero-compact h1 { font-size:1.9rem; }
+.hero-compact .app-icon { width:30px !important; height:30px !important; }
 .section-heading { color:var(--amber); font-size:1.35rem; font-weight:800; margin:.8rem 0 .5rem; }
 [class*="st-key-product_card_"] { box-sizing:border-box; min-height:230px; padding-bottom:18px !important; height:auto !important; overflow:visible !important; }
 [class*="st-key-tournament_product_card_"] { box-sizing:border-box; min-height:9.5rem; padding-bottom:18px !important; height:auto !important; overflow:visible !important; }
@@ -222,7 +227,8 @@ def show_hero():
     st.markdown(f'<div class="hero"><h1>{icon("coffee", 44)} Campus Tycoon</h1><p>Run a small campus shop for five days.</p></div>', unsafe_allow_html=True)
 
 def show_signed_in_banner():
-    st.markdown(f'<div class="hero"><h1>{icon("coffee", 44)} Campus Tycoon</h1><p>Run a small campus shop for five days.</p></div>', unsafe_allow_html=True)
+    # Smaller than the signed-out banner, so the game starts higher on the screen.
+    st.markdown(f'<div class="hero hero-compact"><h1>{icon("coffee", 30)} Campus Tycoon</h1><p>Run a small campus shop for five days.</p></div>', unsafe_allow_html=True)
 
 # Before signing in: only a short welcome and the sign-in button, no game data.
 if not st.user.is_logged_in:
@@ -267,6 +273,8 @@ def forget_practice_prices():
 # The Practice screen is a fragment: its buttons rerun only this screen, not the whole app.
 @st.fragment
 def practice_screen():
+    if st.session_state.pop("reset_practice_prices", False):
+        forget_practice_prices()
     show_flash("practice")
     try:
         game = logic.load_game(DB_PATH, PLAYER)
@@ -300,54 +308,6 @@ def practice_screen():
         elif email_status == "failed":
             notice("warning", "We could not send the email, but your result is saved.")
 
-    if not run_complete:
-        with st.expander("AI business advisor"):
-            if st.button("Ask the advisor", key="practice_advisor_button", icon=":material/psychology:"):
-                api_key = st.secrets.get("OPENROUTER_API_KEY", "")
-                advice = logic.get_advice(
-                    game,
-                    lambda prompt: advisor.ask_openrouter(prompt, api_key),
-                )
-                label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
-                st.write(label)
-                st.table(
-                    [
-                        {
-                            "Product": product,
-                            "Price": f"€{line['price']:.2f}",
-                            "Reason": line["reason"],
-                        }
-                        for product, line in advice["prices"].items()
-                    ]
-                )
-
-    with st.expander("New run", expanded=run_complete):
-        new_level = st.selectbox(
-            "Difficulty",
-            list(logic.DIFFICULTY_LEVELS),
-            index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
-            format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
-            key="new_run_level",
-        )
-        if not st.session_state.get("confirm_new_run"):
-            if st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:"):
-                st.session_state["confirm_new_run"] = True
-                st.rerun(scope="fragment")
-        else:
-            notice("warning", f"Start a new {new_level} run? The current run and its history will be lost.")
-            col1, col2 = st.columns(2)
-            if col1.button("Yes, start a new run", key="practice_confirm_new_run_button", icon=":material/check:"):
-                try:
-                    logic.new_run(DB_PATH, PLAYER, new_level)
-                    st.session_state["confirm_new_run"] = False
-                    forget_practice_prices()
-                    st.rerun(scope="fragment")
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
-            if col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:"):
-                st.session_state["confirm_new_run"] = False
-                st.rerun(scope="fragment")
-
     section_heading("cart", "Products")
     if not run_complete:
         preview = logic.demand_preview(game)
@@ -367,8 +327,36 @@ def practice_screen():
         "5 units up to twice the reference price, 0 units above that."
     )
 
-    action_columns = st.columns(3)
+    st.markdown(
+        '<div class="day-steps">Each day: <b>1</b> Buy stock · <b>2</b> Set prices · <b>3</b> Trade one day</div>',
+        unsafe_allow_html=True,
+    )
+    action_columns = st.columns(2)
     with action_columns[0]:
+        with st.container(border=True, key="action_buy"):
+            section_heading("cart", "Buy stock")
+            # clear_on_submit puts every quantity back to 0 after buying.
+            with st.form("practice_buy_form", border=False, clear_on_submit=True):
+                quantities = {}
+                for name, details in logic.PRODUCTS.items():
+                    quantities[name] = st.number_input(
+                        f"{name} (€{details['unit_cost']:.2f} each)", min_value=0, step=1, value=0,
+                        key=f"practice_buy_{name}",
+                    )
+                buy_submitted = st.form_submit_button(
+                    "Buy", icon=":material/shopping_cart:", disabled=run_complete, use_container_width=True,
+                )
+            if buy_submitted:
+                order = {name: int(value) for name, value in quantities.items()}
+                try:
+                    logic.buy_many(DB_PATH, PLAYER, order)
+                    flash("practice", f"Stock bought for €{logic.order_cost({n: q for n, q in order.items() if q > 0}):.2f}.", kind="toast")
+                    st.rerun(scope="fragment")
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
+
+
+    with action_columns[1]:
         with st.container(border=True, key="action_price"):
             section_heading("trending-up", "Selling prices")
             # A form: typing a price reruns nothing until the button is pressed.
@@ -398,49 +386,11 @@ def practice_screen():
                     except (ValueError, db.DatabaseUnavailable) as error:
                         notice("error", friendly_error(error))
 
-    with action_columns[1]:
-        with st.container(border=True, key="action_loan"):
-            section_heading("wallet", "Loan")
-            st.caption(
-                f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
-                f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
-            )
-            has_loan = game["debt"] > 0
-            loan_amount = st.number_input(
-                "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
-                key="loan_amount",
-            )
-            st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
-            if st.button("Take loan", key="practice_loan_button", icon=":material/account_balance_wallet:", disabled=run_complete or has_loan, use_container_width=True):
-                try:
-                    logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
-                    flash("practice", "Loan taken.", kind="toast")
-                    st.rerun(scope="fragment")
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
 
-    with action_columns[2]:
-        with st.container(border=True, key="action_buy"):
-            section_heading("cart", "Buy stock")
-            # clear_on_submit puts every quantity back to 0 after buying.
-            with st.form("practice_buy_form", border=False, clear_on_submit=True):
-                quantities = {}
-                for name, details in logic.PRODUCTS.items():
-                    quantities[name] = st.number_input(
-                        f"{name} (€{details['unit_cost']:.2f} each)", min_value=0, step=1, value=0,
-                        key=f"practice_buy_{name}",
-                    )
-                buy_submitted = st.form_submit_button(
-                    "Buy", icon=":material/shopping_cart:", disabled=run_complete, use_container_width=True,
-                )
-            if buy_submitted:
-                order = {name: int(value) for name, value in quantities.items()}
-                try:
-                    logic.buy_many(DB_PATH, PLAYER, order)
-                    flash("practice", f"Stock bought for €{logic.order_cost({n: q for n, q in order.items() if q > 0}):.2f}.", kind="toast")
-                    st.rerun(scope="fragment")
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
+    if not run_complete:
+        # Hints only: the player can still trade (specs/feature-easier-screens.md).
+        for warning in logic.trade_warnings(game["stock"], game["price"]):
+            notice("warning", warning)
 
     if st.button("Trade one day", key="practice_trade_day_button", disabled=run_complete, type="primary", use_container_width=True, icon=":material/play_arrow:"):
         try:
@@ -454,6 +404,83 @@ def practice_screen():
             st.rerun(scope="fragment")
         except (ValueError, db.DatabaseUnavailable) as error:
             notice("error", friendly_error(error))
+
+
+    section_heading("box", "More options")
+    option_columns = st.columns(3)
+    with option_columns[0]:
+        if not run_complete:
+            with st.expander("AI business advisor"):
+                if st.button("Ask the advisor", key="practice_advisor_button", icon=":material/psychology:"):
+                    api_key = st.secrets.get("OPENROUTER_API_KEY", "")
+                    advice = logic.get_advice(
+                        game,
+                        lambda prompt: advisor.ask_openrouter(prompt, api_key),
+                    )
+                    label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
+                    st.write(label)
+                    st.table(
+                        [
+                            {
+                                "Product": product,
+                                "Price": f"€{line['price']:.2f}",
+                                "Reason": line["reason"],
+                            }
+                            for product, line in advice["prices"].items()
+                        ]
+                    )
+
+    with option_columns[1]:
+        with st.expander("Loan"):
+            st.caption(
+                f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
+                f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
+            )
+            has_loan = game["debt"] > 0
+            if has_loan:
+                st.write(f"Loan taken: you owe €{game['debt']:.2f}.")
+            loan_amount = st.number_input(
+                "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
+                key="loan_amount",
+            )
+            st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
+            if st.button("Take loan", key="practice_loan_button", icon=":material/account_balance_wallet:", disabled=run_complete or has_loan, use_container_width=True):
+                try:
+                    logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
+                    flash("practice", "Loan taken.", kind="toast")
+                    st.rerun(scope="fragment")
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
+
+    with option_columns[2]:
+        with st.expander("New run", expanded=run_complete):
+            new_level = st.selectbox(
+                "Difficulty",
+                list(logic.DIFFICULTY_LEVELS),
+                index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
+                format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
+                key="new_run_level",
+            )
+            if not st.session_state.get("confirm_new_run"):
+                if st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:"):
+                    st.session_state["confirm_new_run"] = True
+                    st.rerun(scope="fragment")
+            else:
+                notice("warning", f"Start a new {new_level} run? The current run and its history will be lost.")
+                col1, col2 = st.columns(2)
+                if col1.button("Yes, start a new run", key="practice_confirm_new_run_button", icon=":material/check:"):
+                    try:
+                        logic.new_run(DB_PATH, PLAYER, new_level)
+                        st.session_state["confirm_new_run"] = False
+                        # The price fields are already drawn in this run, so clear them at the next one.
+                        st.session_state["reset_practice_prices"] = True
+                        st.rerun(scope="fragment")
+                    except (ValueError, db.DatabaseUnavailable) as error:
+                        notice("error", friendly_error(error))
+                if col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:"):
+                    st.session_state["confirm_new_run"] = False
+                    st.rerun(scope="fragment")
+
 
     section_heading("trending-up", "Results")
     try:
@@ -597,12 +624,18 @@ def tournament_card(tournament_id, player):
 
         section_heading("cart", "Products")
         product_columns = st.columns(3)
+        # Reference price today for this stand: weather and Coffee machine can raise it.
+        references = logic.stand_references(today_weather, owned)
         for index, product in enumerate(products):
+            reference = references[product]
             with product_columns[index]:
                 product_card(
                     product,
-                    [("Stock", own["stock"][product]), ("Price", f"€{own['price'][product]:.2f}")],
-                    "",
+                    [
+                        ("Stock", own["stock"][product]), ("Price", f"€{own['price'][product]:.2f}"),
+                        ("Reference today", f"€{reference:.2f}"), ("Unit cost", f"€{logic.PRODUCTS[product]['unit_cost']:.2f}"),
+                    ],
+                    f"Budget customers pay up to €{reference:.2f}, premium up to €{2 * reference:.2f}.",
                     key=f"tournament_product_card_{tournament_id}_{product}",
                 )
 
@@ -693,6 +726,9 @@ def tournament_card(tournament_id, player):
                 show_flash(f"t{tournament_id}_upgrade")
 
         if can_act:
+            # Hints only: Ready stays allowed (specs/feature-easier-screens.md).
+            for warning in logic.trade_warnings(own["stock"], own["price"], references):
+                notice("warning", warning)
             if st.button("Ready", key=f"t{tournament_id}_ready_button", icon=":material/check:", type="primary", use_container_width=True):
                 try:
                     result = logic.ready_tournament(DB_PATH, player, tournament_id)
@@ -798,10 +834,15 @@ def tournaments_screen():
         notice("error", friendly_error(error))
         my_stands = []
 
-    if my_stands:
+    active, finished = logic.split_tournaments(my_stands)
+    if active:
         section_heading("trophy", "My tournament stands")
-        for stand in my_stands:
+        for stand in active:
             tournament_card(stand["id"], PLAYER)
+    if finished:
+        with st.expander(f"Finished tournaments ({len(finished)})"):
+            for stand in finished:
+                tournament_card(stand["id"], PLAYER)
 
 
 def help_screen():
@@ -812,10 +853,11 @@ def help_screen():
         ("wallet", "Loan", f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with {logic.LOAN_INTEREST:.0%} interest, which is subtracted from your final gain."),
     ]
     upgrade_cost = next(details["cost"] for details in logic.UPGRADES.values())
-    help_content.append(("users", "Tournaments", "Join with a code to play in a shared market. The cheapest price sells first. Players use Ready and the organiser can Close day. Weather comes from Lisbon. You can buy a Coffee machine upgrade for €" + f"{upgrade_cost:.2f}."))
+    help_content.append(("users", "Tournaments", "Create a tournament and share its join code, or join one with a code. All players share the same customers: 10 per player and product each day, half budget (they pay up to the reference price) and half premium (up to twice it). The cheapest stand sells first."))
+    help_content.append(("cloud-sun", "A tournament day", "Buy stock and set prices, then press Ready. The day closes when everyone is Ready or the organiser presses Close day now. Press Refresh to see who is ready. After each day, Market results show every stand's price and units sold. Rain raises the Café reference to €5.00, heat raises Water to €1.50, and the Coffee machine (€" + f"{upgrade_cost:.2f}" + ") raises your Café reference to €5.00: each card shows your reference today."))
     help_columns = st.columns(2)
     for index, (glyph, heading, body) in enumerate(help_content):
-        target = help_columns[index % 2] if index < 4 else st.container()
+        target = help_columns[index % 2]
         with target:
             with st.container(border=True, key=f"help_section_{heading}"):
                 st.markdown(f'<div class="section-heading">{icon(glyph)} {heading}</div>', unsafe_allow_html=True)

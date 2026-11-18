@@ -966,3 +966,50 @@ def group_day_results(rows):
         stands[-1]["price"][row["product"]] = row["price"]
         stands[-1]["units_sold"][row["product"]] = row["units_sold"]
     return days
+
+
+# Easier screens (specs/feature-easier-screens.md): hints shown before the player trades.
+
+def trade_warnings(stock, prices, references=None):
+    """Short messages about a day that would sell nothing or lose money. Trading stays allowed."""
+    if sum(stock.values()) == 0:
+        return ["You have no stock, so this day sells nothing. Buy stock first."]
+    warnings = []
+    for product, details in PRODUCTS.items():
+        if stock[product] == 0:
+            continue
+        reference = references[product] if references else details["reference_price"]
+        price = prices[product]
+        if price > 2 * reference:
+            warnings.append(f"{product}: above €{2 * reference:.2f}, nobody will buy it.")
+        elif price < details["unit_cost"]:
+            warnings.append(
+                f"{product}: below its unit cost (€{details['unit_cost']:.2f}), every sale loses money."
+            )
+    return warnings
+
+
+def stand_references(weather, upgrades):
+    """Reference price of each product for one tournament stand today.
+
+    Same rule as _close_tournament_day and tournament_market_sales: the weather and the stand's
+    upgrades can raise a reference, and the higher one counts.
+    """
+    references = {product: details["reference_price"] for product, details in PRODUCTS.items()}
+    raised = {}
+    if weather.get("rain"):
+        raised["Café"] = 5.00
+    if weather.get("hot"):
+        raised["Water"] = 1.50
+    for upgrade in upgrades:
+        details = UPGRADES[upgrade]
+        raised[details["product"]] = max(raised.get(details["product"], 0), details["reference_price"])
+    references.update(raised)
+    return references
+
+
+def split_tournaments(rows):
+    """Active tournaments (day 1 to 5) first, finished ones (after day 5) apart, same order."""
+    active = [row for row in rows if row["day"] <= RUN_DAYS]
+    finished = [row for row in rows if row["day"] > RUN_DAYS]
+    return active, finished
