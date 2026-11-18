@@ -899,7 +899,7 @@ def my_tournaments(db_path, player):
 
 
 def tournament_screen(db_path, player, tournament_id, fetch):
-    """Everything one tournament card shows, read with at most 5 statements."""
+    """Everything one tournament card shows, read with at most 5 statements once the weather is saved."""
     check_player(player)
     tournament = db.get_tournament(db_path, tournament_id)
     if tournament is None:
@@ -947,4 +947,22 @@ def tournament_screen(db_path, player, tournament_id, fetch):
         ],
         "upgrades": db.get_tournament_upgrades(db_path, tournament_id, player),
         "ranking": ranking,
+        "days": group_day_results(db.get_tournament_results(db_path, tournament_id)),
     }
+
+
+def group_day_results(rows):
+    """One entry per closed day, oldest first; per stand only the price and units sold."""
+    days = []
+    for row in rows:
+        if not days or days[-1]["day"] != row["day"]:
+            days.append({"day": row["day"], "stands": []})
+        stands = days[-1]["stands"]
+        if not stands or stands[-1]["player"] != row["player"]:
+            stands.append({
+                "player": row["player"], "name": player_name(row["player"]),
+                "price": {}, "units_sold": {},
+            })
+        stands[-1]["price"][row["product"]] = row["price"]
+        stands[-1]["units_sold"][row["product"]] = row["units_sold"]
+    return days

@@ -529,6 +529,18 @@ def show_closed_day(closed_day, player, scope):
             )
 
 
+def market_rows(day, player):
+    # One row per stand: price and units sold of each product (no cash or stock of others).
+    rows = []
+    for stand in day["stands"]:
+        row = {"Player": stand["name"] + (" (you)" if stand["player"] == player else "")}
+        for product in logic.PRODUCTS:
+            row[f"{product} price"] = f"€{stand['price'][product]:.2f}"
+            row[f"{product} sold"] = stand["units_sold"][product]
+        rows.append(row)
+    return rows
+
+
 # Each tournament card is a fragment: its buttons rerun only this card.
 @st.fragment
 def tournament_card(tournament_id, player):
@@ -554,11 +566,15 @@ def tournament_card(tournament_id, player):
     owned = screen["upgrades"]
 
     with st.container(border=True, key=f"tournament_card_{tournament_id}"):
-        header_left, header_right = st.columns([5, 1], vertical_alignment="center")
+        header_left, header_code, header_refresh = st.columns([4, 1, 1], vertical_alignment="center")
         with header_left:
             st.markdown(f'<div style="font-size:1.55rem;font-weight:800">{html.escape(str(screen["name"]))}</div>', unsafe_allow_html=True)
-        with header_right:
+        with header_code:
             st.markdown(f'<div style="text-align:right"><span class="code-badge">{html.escape(str(screen["code"]))}</span></div>', unsafe_allow_html=True)
+        with header_refresh:
+            # The brief asks for a Refresh button instead of live updates: it reloads only this card.
+            if st.button("Refresh", key=f"t{tournament_id}_refresh_button", icon=":material/refresh:", use_container_width=True):
+                st.rerun(scope="fragment")
 
         weather_tints = {
             "rain": ("rgba(96,165,250,0.30)", "rgba(30,64,175,0.15)"),
@@ -679,8 +695,12 @@ def tournament_card(tournament_id, player):
         if can_act:
             if st.button("Ready", key=f"t{tournament_id}_ready_button", icon=":material/check:", type="primary", use_container_width=True):
                 try:
-                    logic.ready_tournament(DB_PATH, player, tournament_id)
-                    flash(f"t{tournament_id}_ready", "You are Ready.")
+                    result = logic.ready_tournament(DB_PATH, player, tournament_id)
+                    if result["closed_day"]:
+                        # Everyone is ready, so this click closed the day: show its result.
+                        flash(f"t{tournament_id}_ready", result["closed_day"], kind="closed_day")
+                    else:
+                        flash(f"t{tournament_id}_ready", "You are Ready.")
                     st.rerun(scope="fragment")
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
@@ -724,6 +744,17 @@ def tournament_card(tournament_id, player):
                 f'<span style="padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.07);color:{ready_color};font-size:.8rem;font-weight:700">{ready_label}</span></div>',
                 unsafe_allow_html=True,
             )
+
+        if screen["days"]:
+            section_heading("trending-up", "Market results")
+            latest = screen["days"][-1]
+            st.caption(f"Day {latest['day']}: every stand's price and units sold.")
+            st.table(market_rows(latest, player))
+            if len(screen["days"]) > 1:
+                with st.expander("Earlier days"):
+                    for day in reversed(screen["days"][:-1]):
+                        st.write(f"Day {day['day']}")
+                        st.table(market_rows(day, player))
 
 
 def tournaments_screen():

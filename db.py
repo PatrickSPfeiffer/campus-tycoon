@@ -519,6 +519,29 @@ def close_tournament_day(db_path, tournament_id, day, stands, by_player):
     return result
 
 
+def get_tournament_results(db_path, tournament_id):
+    # Every closed day's price and units sold per stand and product (specs/feature-tournament-day-results.md).
+    with open_database(db_path) as conn:
+        rows = conn.execute(
+            "SELECT r.day, r.player, s.seat, r.product, r.price, r.units_sold "
+            "FROM tournament_results AS r JOIN stands AS s "
+            "ON s.tournament_id = r.tournament_id AND s.player = r.player "
+            "WHERE r.tournament_id = ? ORDER BY r.day, s.seat, r.product",
+            (tournament_id,),
+        ).fetchall()
+    return [
+        {
+            "day": row[0],
+            "player": row[1],
+            "seat": row[2],
+            "product": row[3],
+            "price": float(row[4]),
+            "units_sold": row[5],
+        }
+        for row in rows
+    ]
+
+
 def get_tournament_ranking_rows(db_path, tournament_id):
     with open_database(db_path) as conn:
         rows = conn.execute(
