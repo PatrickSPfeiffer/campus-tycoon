@@ -94,6 +94,11 @@ def create_tables(conn):
         " start_cash REAL NOT NULL DEFAULT 100.0,"
         " debt REAL NOT NULL DEFAULT 0)"
     )
+    game_columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(games)").fetchall()
+    }
+    if "debt" not in game_columns:
+        conn.execute("ALTER TABLE games ADD COLUMN debt REAL NOT NULL DEFAULT 0")
     conn.execute(
         "CREATE TABLE IF NOT EXISTS products ("
         " player TEXT NOT NULL,"
