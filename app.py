@@ -256,30 +256,33 @@ with col2:
     if st.button("Sign out", key="sign_out_button", icon=":material/logout:", use_container_width=True):
         st.logout()
 
-try:
-    game = logic.load_game(DB_PATH, PLAYER)
-except db.DatabaseUnavailable as error:
-    notice("error", friendly_error(error))
-    st.stop()
-run_complete = logic.is_run_complete(game)
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Cash", f"€{game['cash']:.2f}")
-if run_complete:
-    col2.metric("Progress", "Run complete")
-else:
-    col2.metric("Progress", f"Day {game['day']} of {logic.RUN_DAYS}")
-col3.metric("Loan to repay", f"€{game['debt']:.2f}")
-st.caption(f"Level: {logic.level_name(game)} (started with €{game['start_cash']:.2f})")
 
-practice_tab, tournament_tab, help_tab = st.tabs([
-    ":material/storefront: Practice",
-    ":material/emoji_events: Tournaments",
-    ":material/help: How to play",
-])
+def forget_practice_prices():
+    # The price fields remember what was typed; after a new run they must show the new prices.
+    for name in logic.PRODUCTS:
+        st.session_state.pop(f"practice_price_{name}", None)
 
-with practice_tab:
+
+# The Practice screen is a fragment: its buttons rerun only this screen, not the whole app.
+@st.fragment
+def practice_screen():
     show_flash("practice")
+    try:
+        game = logic.load_game(DB_PATH, PLAYER)
+    except db.DatabaseUnavailable as error:
+        notice("error", friendly_error(error))
+        return
+    run_complete = logic.is_run_complete(game)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Cash", f"€{game['cash']:.2f}")
+    if run_complete:
+        col2.metric("Progress", "Run complete")
+    else:
+        col2.metric("Progress", f"Day {game['day']} of {logic.RUN_DAYS}")
+    col3.metric("Loan to repay", f"€{game['debt']:.2f}")
+    st.caption(f"Level: {logic.level_name(game)} (started with €{game['start_cash']:.2f})")
 
     if run_complete:
         final = logic.final_result(game)
@@ -329,7 +332,7 @@ with practice_tab:
         if not st.session_state.get("confirm_new_run"):
             if st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:"):
                 st.session_state["confirm_new_run"] = True
-                st.rerun()
+                st.rerun(scope="fragment")
         else:
             notice("warning", f"Start a new {new_level} run? The current run and its history will be lost.")
             col1, col2 = st.columns(2)
@@ -337,12 +340,13 @@ with practice_tab:
                 try:
                     logic.new_run(DB_PATH, PLAYER, new_level)
                     st.session_state["confirm_new_run"] = False
-                    st.rerun()
+                    forget_practice_prices()
+                    st.rerun(scope="fragment")
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
             if col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:"):
                 st.session_state["confirm_new_run"] = False
-                st.rerun()
+                st.rerun(scope="fragment")
 
     section_heading("cart", "Products")
     if not run_complete:
@@ -366,19 +370,33 @@ with practice_tab:
     action_columns = st.columns(3)
     with action_columns[0]:
         with st.container(border=True, key="action_price"):
-            section_heading("trending-up", "Selling price")
-            price_product = st.selectbox("Product", list(logic.PRODUCTS), key="price_product")
-            new_price = st.number_input(
-                "Price (€)", step=0.01, value=game["price"][price_product], format="%.2f",
-                key=f"price_{price_product}",
-            )
-            if st.button("Set price", key="practice_price_button", icon=":material/sell:", use_container_width=True):
-                try:
-                    logic.set_price(DB_PATH, PLAYER, price_product, round(float(new_price), 2))
-                    flash("practice", "Price updated.", kind="toast")
-                    st.rerun()
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
+            section_heading("trending-up", "Selling prices")
+            # A form: typing a price reruns nothing until the button is pressed.
+            with st.form("practice_price_form", border=False):
+                new_prices = {}
+                for name in logic.PRODUCTS:
+                    new_prices[name] = st.number_input(
+                        f"{name} (€)", min_value=0.01, max_value=logic.MAX_PRICE, step=0.01,
+                        value=game["price"][name], format="%.2f", key=f"practice_price_{name}",
+                    )
+                prices_submitted = st.form_submit_button(
+                    "Set prices", icon=":material/sell:", disabled=run_complete, use_container_width=True,
+                )
+            if prices_submitted:
+                changed = {
+                    name: round(float(value), 2)
+                    for name, value in new_prices.items()
+                    if round(float(value), 2) != game["price"][name]
+                }
+                if not changed:
+                    notice("info", "No price changed.")
+                else:
+                    try:
+                        logic.set_prices(DB_PATH, PLAYER, changed)
+                        flash("practice", "Prices updated.", kind="toast")
+                        st.rerun(scope="fragment")
+                    except (ValueError, db.DatabaseUnavailable) as error:
+                        notice("error", friendly_error(error))
 
     with action_columns[1]:
         with st.container(border=True, key="action_loan"):
@@ -397,21 +415,30 @@ with practice_tab:
                 try:
                     logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
                     flash("practice", "Loan taken.", kind="toast")
-                    st.rerun()
+                    st.rerun(scope="fragment")
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
 
     with action_columns[2]:
         with st.container(border=True, key="action_buy"):
-            section_heading("cart", "Buy")
-            buy_product = st.selectbox("Product", list(logic.PRODUCTS), key="buy_product")
-            quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key="practice_buy_quantity")
-            st.write(f"Total cost €{logic.buy_cost(buy_product, int(quantity)):.2f}")
-            if st.button("Buy", key="practice_buy_button", disabled=run_complete, use_container_width=True, icon=":material/shopping_cart:"):
+            section_heading("cart", "Buy stock")
+            # clear_on_submit puts every quantity back to 0 after buying.
+            with st.form("practice_buy_form", border=False, clear_on_submit=True):
+                quantities = {}
+                for name, details in logic.PRODUCTS.items():
+                    quantities[name] = st.number_input(
+                        f"{name} (€{details['unit_cost']:.2f} each)", min_value=0, step=1, value=0,
+                        key=f"practice_buy_{name}",
+                    )
+                buy_submitted = st.form_submit_button(
+                    "Buy", icon=":material/shopping_cart:", disabled=run_complete, use_container_width=True,
+                )
+            if buy_submitted:
+                order = {name: int(value) for name, value in quantities.items()}
                 try:
-                    logic.buy(DB_PATH, PLAYER, buy_product, int(quantity))
-                    flash("practice", "Stock bought.", kind="toast")
-                    st.rerun()
+                    logic.buy_many(DB_PATH, PLAYER, order)
+                    flash("practice", f"Stock bought for €{logic.order_cost({n: q for n, q in order.items() if q > 0}):.2f}.", kind="toast")
+                    st.rerun(scope="fragment")
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
 
@@ -424,7 +451,7 @@ with practice_tab:
                     st.session_state["email_status"] = mailer.send_result_email(
                         PLAYER, logic.final_result(game)
                     )
-            st.rerun()
+            st.rerun(scope="fragment")
         except (ValueError, db.DatabaseUnavailable) as error:
             notice("error", friendly_error(error))
 
@@ -484,6 +511,7 @@ with practice_tab:
             icon=":material/download:",
         )
 
+
 def show_closed_day(closed_day, player, scope):
     with st.container(border=True, key=f"{scope}_closed_day"):
         notice("success", f"Day {closed_day['day']} closed.")
@@ -501,47 +529,36 @@ def show_closed_day(closed_day, player, scope):
             )
 
 
-def show_tournament(stand, player):
-    tournament_id = stand["id"]
+# Each tournament card is a fragment: its buttons rerun only this card.
+@st.fragment
+def tournament_card(tournament_id, player):
     try:
-        today_weather = logic.tournament_weather(DB_PATH, tournament_id, weather.fetch_lisbon_weather)
-        if today_weather["rain"]:
-            weather_name = "rain"
-        elif today_weather["hot"]:
-            weather_name = "hot"
-        else:
-            weather_name = "normal"
-        weather_icon, weather_label = {"rain": ("cloud-rain", "Rain"), "hot": ("sun", "Hot"), "normal": ("cloud-sun", "Normal")}[weather_name]
+        screen = logic.tournament_screen(DB_PATH, player, tournament_id, weather.fetch_lisbon_weather)
     except (ValueError, db.DatabaseUnavailable) as error:
         notice("error", friendly_error(error))
         return
-    try:
-        status = logic.tournament_status(DB_PATH, player, tournament_id)
-    except (ValueError, db.DatabaseUnavailable) as error:
-        notice("error", friendly_error(error))
-        return
+    today_weather = screen["weather"]
+    if today_weather["rain"]:
+        weather_name = "rain"
+    elif today_weather["hot"]:
+        weather_name = "hot"
+    else:
+        weather_name = "normal"
+    weather_icon, weather_label = {"rain": ("cloud-rain", "Rain"), "hot": ("sun", "Hot"), "normal": ("cloud-sun", "Normal")}[weather_name]
 
     products = list(logic.PRODUCTS)
-    own_player = next((row for row in status["players"] if row["player"] == player), None)
-    # Reload status so readiness and all displayed tournament data are current.
-    try:
-        status = logic.tournament_status(DB_PATH, player, tournament_id)
-        stands = logic.get_my_stands(DB_PATH, player)
-    except (ValueError, db.DatabaseUnavailable) as error:
-        notice("error", friendly_error(error))
-        return
-    own_player = next((row for row in status["players"] if row["player"] == player), None)
-    is_ready = bool(own_player and own_player["ready"])
-    current_stand = next((item for item in stands if item["id"] == tournament_id), None)
-    if current_stand is None:
-        return
+    own = screen["stand"]
+    is_ready = own["ready"]
+    playing = screen["day"] <= logic.RUN_DAYS
+    can_act = playing and not is_ready
+    owned = screen["upgrades"]
 
     with st.container(border=True, key=f"tournament_card_{tournament_id}"):
         header_left, header_right = st.columns([5, 1], vertical_alignment="center")
         with header_left:
-            st.markdown(f'<div style="font-size:1.55rem;font-weight:800">{html.escape(str(current_stand["name"]))}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="font-size:1.55rem;font-weight:800">{html.escape(str(screen["name"]))}</div>', unsafe_allow_html=True)
         with header_right:
-            st.markdown(f'<div style="text-align:right"><span class="code-badge">{html.escape(str(current_stand["code"]))}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:right"><span class="code-badge">{html.escape(str(screen["code"]))}</span></div>', unsafe_allow_html=True)
 
         weather_tints = {
             "rain": ("rgba(96,165,250,0.30)", "rgba(30,64,175,0.15)"),
@@ -558,134 +575,147 @@ def show_tournament(stand, player):
         )
 
         metric_columns = st.columns(3)
-        metric_columns[0].metric("Day", f"Day {status['day']} of {logic.RUN_DAYS}")
-        metric_columns[1].metric("Cash", f"€{current_stand['cash']:.2f}")
-        metric_columns[2].metric("Players ready", f"{sum(1 for row in status['players'] if row['ready'])}/{len(status['players'])}")
+        metric_columns[0].metric("Day", f"Day {screen['day']} of {logic.RUN_DAYS}" if playing else "Complete")
+        metric_columns[1].metric("Cash", f"€{own['cash']:.2f}")
+        metric_columns[2].metric("Players ready", f"{sum(1 for row in screen['players'] if row['ready'])}/{len(screen['players'])}")
 
         section_heading("cart", "Products")
         product_columns = st.columns(3)
-        for index, product in enumerate(current_stand["products"]):
+        for index, product in enumerate(products):
             with product_columns[index]:
                 product_card(
-                    product["product"],
-                    [("Stock", product["stock"]), ("Price", f"€{product['price']:.2f}")],
+                    product,
+                    [("Stock", own["stock"][product]), ("Price", f"€{own['price'][product]:.2f}")],
                     "",
-                    key=f"tournament_product_card_{tournament_id}_{product['product']}",
+                    key=f"tournament_product_card_{tournament_id}_{product}",
                 )
 
         action_columns = st.columns(2)
         with action_columns[0]:
             with st.container(border=True, key=f"action_t{tournament_id}_buy"):
                 section_heading("cart", "Buy stock")
-                if status["day"] <= logic.RUN_DAYS and not is_ready:
-                    buy_product = st.selectbox("Product", products, key=f"tournament_buy_product_{tournament_id}")
-                    quantity = st.number_input("Quantity", min_value=1, step=1, value=1, key=f"tournament_quantity_{tournament_id}")
-                    buy_submitted = st.button("Buy", key=f"t{tournament_id}_buy_button", use_container_width=True)
+                if can_act:
+                    with st.form(f"t{tournament_id}_buy_form", border=False, clear_on_submit=True):
+                        quantities = {}
+                        for product in products:
+                            quantities[product] = st.number_input(
+                                f"{product} (€{logic.PRODUCTS[product]['unit_cost']:.2f} each)",
+                                min_value=0, step=1, value=0, key=f"t{tournament_id}_buy_{product}",
+                            )
+                        buy_submitted = st.form_submit_button("Buy", icon=":material/shopping_cart:", use_container_width=True)
                     if buy_submitted:
                         try:
-                            logic.buy_tournament_stock(DB_PATH, player, tournament_id, buy_product, int(quantity))
-                            flash(f"t{tournament_id}_buy", "Stock purchased.")
-                            st.rerun()
+                            bought = logic.buy_tournament_stock_many(
+                                DB_PATH, player, tournament_id,
+                                {product: int(value) for product, value in quantities.items()},
+                            )
+                            flash(f"t{tournament_id}_buy", f"Stock purchased for €{bought['cost']:.2f}.")
+                            st.rerun(scope="fragment")
                         except (ValueError, db.DatabaseUnavailable) as error:
                             notice("error", friendly_error(error))
                     show_flash(f"t{tournament_id}_buy")
 
         with action_columns[1]:
             with st.container(border=True, key=f"action_t{tournament_id}_price"):
-                section_heading("trending-up", "Set price")
-                if status["day"] <= logic.RUN_DAYS and not is_ready:
-                    price_product = st.selectbox("Product", products, key=f"tournament_price_product_{tournament_id}")
-                    current_price = next((item["price"] for item in current_stand["products"] if item["product"] == price_product), 1.0)
-                    price = st.number_input("Price (€)", min_value=0.01, step=0.01, value=float(current_price), format="%.2f", key=f"t{tournament_id}_price_input_{price_product}")
-                    price_submitted = st.button("Set price", key=f"t{tournament_id}_price_button", use_container_width=True)
+                section_heading("trending-up", "Set prices")
+                if can_act:
+                    with st.form(f"t{tournament_id}_price_form", border=False):
+                        new_prices = {}
+                        for product in products:
+                            new_prices[product] = st.number_input(
+                                f"{product} (€)", min_value=0.01, max_value=logic.MAX_PRICE, step=0.01,
+                                value=float(own["price"][product]), format="%.2f",
+                                key=f"t{tournament_id}_price_{product}",
+                            )
+                        price_submitted = st.form_submit_button("Set prices", icon=":material/sell:", use_container_width=True)
                     if price_submitted:
-                        try:
-                            logic.set_tournament_price(DB_PATH, player, tournament_id, price_product, round(float(price), 2))
-                            flash(f"t{tournament_id}_price", "Price updated.")
-                            st.rerun()
-                        except (ValueError, db.DatabaseUnavailable) as error:
-                            notice("error", friendly_error(error))
+                        changed = {
+                            product: round(float(value), 2)
+                            for product, value in new_prices.items()
+                            if round(float(value), 2) != own["price"][product]
+                        }
+                        if not changed:
+                            notice("info", "No price changed.")
+                        else:
+                            try:
+                                logic.set_tournament_prices(DB_PATH, player, tournament_id, changed)
+                                flash(f"t{tournament_id}_price", "Prices updated.")
+                                st.rerun(scope="fragment")
+                            except (ValueError, db.DatabaseUnavailable) as error:
+                                notice("error", friendly_error(error))
                     show_flash(f"t{tournament_id}_price")
 
-        try:
-            owned = logic.tournament_upgrades(DB_PATH, player, tournament_id)
-            for name, details in logic.UPGRADES.items():
-                product_name = html.escape(str(details["product"]))
-                reference_price = html.escape(f"€{float(details['reference_price']):.2f}")
-                with st.container(border=True, key=f"upgrade_tournament_{tournament_id}_{name}"):
-                    upgrade_columns = st.columns([5, 2], vertical_alignment="center")
-                    with upgrade_columns[0]:
+        for name, details in logic.UPGRADES.items():
+            product_name = html.escape(str(details["product"]))
+            reference_price = html.escape(f"€{float(details['reference_price']):.2f}")
+            with st.container(border=True, key=f"upgrade_tournament_{tournament_id}_{name}"):
+                upgrade_columns = st.columns([5, 2], vertical_alignment="center")
+                with upgrade_columns[0]:
+                    st.markdown(
+                        f'<div class="tournament-upgrade-content">{icon("trending-up", 20)}'
+                        f'<span class="tournament-upgrade-name">{html.escape(str(name))}</span>'
+                        f'<span class="tournament-upgrade-description">Raises the {product_name} reference price to {reference_price}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                with upgrade_columns[1]:
+                    if name in owned:
                         st.markdown(
-                            f'<div class="tournament-upgrade-content">{icon("trending-up", 20)}'
-                            f'<span class="tournament-upgrade-name">{html.escape(str(name))}</span>'
-                            f'<span class="tournament-upgrade-description">Raises the {product_name} reference price to {reference_price}</span></div>',
+                            f'<div class="tournament-upgrade-owned"><span class="tournament-owned">{icon("check", 16)} Owned</span></div>',
                             unsafe_allow_html=True,
                         )
-                    with upgrade_columns[1]:
-                        if name in owned:
-                            st.markdown(
-                                f'<div class="tournament-upgrade-owned"><span class="tournament-owned">{icon("check", 16)} Owned</span></div>',
-                                unsafe_allow_html=True,
-                            )
-                        elif status["day"] <= logic.RUN_DAYS and not is_ready:
-                            if st.button(
-                                f"Buy {name} (€{details['cost']:.2f})", icon=":material/upgrade:",
-                                key=f"t{tournament_id}_upgrade_{name}_button", use_container_width=True,
-                            ):
-                                try:
-                                    logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, name)
-                                    flash(f"t{tournament_id}_upgrade", "Upgrade purchased.")
-                                    st.rerun()
-                                except (ValueError, db.DatabaseUnavailable) as error:
-                                    notice("error", friendly_error(error))
-                    show_flash(f"t{tournament_id}_upgrade")
-        except (ValueError, db.DatabaseUnavailable) as error:
-            notice("error", friendly_error(error))
+                    elif can_act:
+                        if st.button(
+                            f"Buy {name} (€{details['cost']:.2f})", icon=":material/upgrade:",
+                            key=f"t{tournament_id}_upgrade_{name}_button", use_container_width=True,
+                        ):
+                            try:
+                                logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, name)
+                                flash(f"t{tournament_id}_upgrade", "Upgrade purchased.")
+                                st.rerun(scope="fragment")
+                            except (ValueError, db.DatabaseUnavailable) as error:
+                                notice("error", friendly_error(error))
+                show_flash(f"t{tournament_id}_upgrade")
 
-        if status["day"] <= logic.RUN_DAYS and not is_ready:
+        if can_act:
             if st.button("Ready", key=f"t{tournament_id}_ready_button", icon=":material/check:", type="primary", use_container_width=True):
                 try:
-                    result = logic.ready_tournament(DB_PATH, player, tournament_id)
+                    logic.ready_tournament(DB_PATH, player, tournament_id)
                     flash(f"t{tournament_id}_ready", "You are Ready.")
-                    st.rerun()
+                    st.rerun(scope="fragment")
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
-        elif own_player and own_player["ready"] and status["day"] <= logic.RUN_DAYS:
+        elif is_ready and playing:
             notice("info", "You are Ready. Waiting for the other players.")
         show_flash(f"t{tournament_id}_ready")
-        if player == status["organiser"] and status["day"] <= logic.RUN_DAYS and st.button(
+        if player == screen["organiser"] and playing and st.button(
             "Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:",
             use_container_width=True,
         ):
             try:
                 closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
                 flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
-                st.rerun()
+                st.rerun(scope="fragment")
             except (ValueError, db.DatabaseUnavailable) as error:
                 notice("error", friendly_error(error))
         show_flash(f"t{tournament_id}_close")
 
-        if status["day"] == logic.RUN_DAYS + 1:
+        if screen["ranking"] is not None:
             section_heading("trophy", "Ranking")
-            try:
-                ranking = logic.tournament_ranking(DB_PATH, tournament_id)
-                for position, row in enumerate(ranking, start=1):
-                    position_label = {1: "1st", 2: "2nd", 3: "3rd"}.get(position, str(position))
-                    tone = {1: "#F5A524", 2: "#C0C8D0", 3: "#CD7F32"}.get(position, "rgba(255,255,255,.12)")
-                    st.markdown(
-                        f'<div class="tournament-ranking-row">'
-                        f'<span style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;'
-                        f'border-radius:50%;background:{tone};color:#2B1608;font-weight:800">{position_label}</span>'
-                        f'<strong style="flex:1">{html.escape(str(logic.player_name(row["player"])))}</strong>'
-                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Gain<br><b style="color:var(--text)">€{row["gain"]:.2f}</b></span>'
-                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Final cash<br><b style="color:var(--text)">€{row["final_cash"]:.2f}</b></span>'
-                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Stock at cost<br><b style="color:var(--text)">€{row["stock_at_cost"]:.2f}</b></span></div>',
-                        unsafe_allow_html=True,
-                    )
-            except (ValueError, db.DatabaseUnavailable) as error:
-                notice("error", friendly_error(error))
+            for position, row in enumerate(screen["ranking"], start=1):
+                position_label = {1: "1st", 2: "2nd", 3: "3rd"}.get(position, str(position))
+                tone = {1: "#F5A524", 2: "#C0C8D0", 3: "#CD7F32"}.get(position, "rgba(255,255,255,.12)")
+                st.markdown(
+                    f'<div class="tournament-ranking-row">'
+                    f'<span style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;'
+                    f'border-radius:50%;background:{tone};color:#2B1608;font-weight:800">{position_label}</span>'
+                    f'<strong style="flex:1">{html.escape(str(logic.player_name(row["player"])))}</strong>'
+                    f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Gain<br><b style="color:var(--text)">€{row["gain"]:.2f}</b></span>'
+                    f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Final cash<br><b style="color:var(--text)">€{row["final_cash"]:.2f}</b></span>'
+                    f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Stock at cost<br><b style="color:var(--text)">€{row["stock_at_cost"]:.2f}</b></span></div>',
+                    unsafe_allow_html=True,
+                )
         section_heading("users", "Players")
-        for row in status["players"]:
+        for row in screen["players"]:
             ready_label = "Ready" if row["ready"] else "Not ready"
             ready_color = "var(--good)" if row["ready"] else "var(--muted)"
             st.markdown(
@@ -694,7 +724,9 @@ def show_tournament(stand, player):
                 f'<span style="padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.07);color:{ready_color};font-size:.8rem;font-weight:700">{ready_label}</span></div>',
                 unsafe_allow_html=True,
             )
-with tournament_tab:
+
+
+def tournaments_screen():
     create_column, join_column = st.columns(2)
     with create_column:
         with st.container(border=True):
@@ -730,7 +762,7 @@ with tournament_tab:
                 notice("success", joined_message)
 
     try:
-        my_stands = logic.get_my_stands(DB_PATH, PLAYER)
+        my_stands = logic.my_tournaments(DB_PATH, PLAYER)
     except (ValueError, db.DatabaseUnavailable) as error:
         notice("error", friendly_error(error))
         my_stands = []
@@ -738,10 +770,10 @@ with tournament_tab:
     if my_stands:
         section_heading("trophy", "My tournament stands")
         for stand in my_stands:
-            show_tournament(stand, PLAYER)
+            tournament_card(stand["id"], PLAYER)
 
 
-with help_tab:
+def help_screen():
     help_content = [
         ("trophy", "Goal", "Finish five days with the highest gain."),
         ("clock", "Each day", "Buy stock, set prices, then trade one day."),
@@ -757,3 +789,25 @@ with help_tab:
             with st.container(border=True, key=f"help_section_{heading}"):
                 st.markdown(f'<div class="section-heading">{icon(glyph)} {heading}</div>', unsafe_allow_html=True)
                 st.write(body)
+
+
+# on_change="rerun" makes the tabs remember which one is open, so only that one is built.
+practice_tab, tournament_tab, help_tab = st.tabs(
+    [
+        ":material/storefront: Practice",
+        ":material/emoji_events: Tournaments",
+        ":material/help: How to play",
+    ],
+    key="main_tab",
+    on_change="rerun",
+)
+
+if practice_tab.open:
+    with practice_tab:
+        practice_screen()
+if tournament_tab.open:
+    with tournament_tab:
+        tournaments_screen()
+if help_tab.open:
+    with help_tab:
+        help_screen()

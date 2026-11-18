@@ -809,3 +809,142 @@ def profit_chart_data(results):
             total = total + gross_profit
         data["Total"].append(round(total, 2))
     return data
+
+
+# Faster screens (specs/feature-faster-screens.md): one form saves several products at once,
+# and one call reads everything a tournament card shows.
+
+def check_quantities(quantities):
+    """Return only the products to buy; refuse the whole order if one quantity is wrong."""
+    to_buy = {}
+    for product, quantity in quantities.items():
+        check_product(product)
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 0:
+            raise ValueError("Quantity must be a whole number, 0 or more.")
+        if quantity > 0:
+            to_buy[product] = quantity
+    if not to_buy:
+        raise ValueError("Choose a quantity of at least 1 for one product.")
+    return to_buy
+
+
+def order_cost(to_buy):
+    return round(sum(buy_cost(product, quantity) for product, quantity in to_buy.items()), 2)
+
+
+def check_prices(prices):
+    for product, price in prices.items():
+        check_product(product)
+        check_price(price)
+
+
+def buy_many(db_path, player, quantities):
+    check_player(player)
+    to_buy = check_quantities(quantities)
+    game = load_game(db_path, player)
+    check_run_not_complete(game)
+    cost = order_cost(to_buy)
+    if cost > game["cash"]:
+        raise ValueError(f"Not enough cash: buying costs €{cost:.2f}, you have €{game['cash']:.2f}.")
+    game["cash"] = round(game["cash"] - cost, 2)
+    for product, quantity in to_buy.items():
+        game["stock"][product] = game["stock"][product] + quantity
+    db.save_game(db_path, player, game)
+    return game
+
+
+def set_prices(db_path, player, prices):
+    check_player(player)
+    check_prices(prices)
+    game = load_game(db_path, player)
+    for product, price in prices.items():
+        game["price"][product] = float(price)
+    db.save_game(db_path, player, game)
+    return game
+
+
+def buy_tournament_stock_many(db_path, player, tournament_id, quantities):
+    _tournament_for_action(db_path, tournament_id, "buy")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are Ready and cannot change decisions.")
+    to_buy = check_quantities(quantities)
+    cost = order_cost(to_buy)
+    if cost > stand["cash"]:
+        raise ValueError(
+            f"Not enough cash: buying costs €{cost:.2f}, you have €{stand['cash']:.2f}."
+        )
+    cash = stand["cash"]
+    for product, quantity in to_buy.items():
+        cash = round(cash - buy_cost(product, quantity), 2)
+        db.set_tournament_stock(db_path, tournament_id, player, product, quantity, cash)
+    return {"cash": cash, "cost": cost}
+
+
+def set_tournament_prices(db_path, player, tournament_id, prices):
+    _tournament_for_action(db_path, tournament_id, "price")
+    stand = _tournament_stand_for_action(db_path, tournament_id, player)
+    if stand["ready"]:
+        raise ValueError("You are Ready and cannot change decisions.")
+    check_prices(prices)
+    for product, price in prices.items():
+        db.set_tournament_price(db_path, tournament_id, player, product, float(price))
+    return prices
+
+
+def my_tournaments(db_path, player):
+    """The player's tournaments (id, name, code, day, seat, cash, ready) in one read."""
+    check_player(player)
+    return db.get_player_stands(db_path, player)
+
+
+def tournament_screen(db_path, player, tournament_id, fetch):
+    """Everything one tournament card shows, read with at most 5 statements."""
+    check_player(player)
+    tournament = db.get_tournament(db_path, tournament_id)
+    if tournament is None:
+        raise ValueError("Tournament was not found.")
+    stands = db.get_tournament_stands(db_path, tournament_id)
+    if player not in stands:
+        raise ValueError("You have not joined this tournament.")
+    day = tournament["day"]
+    weather = db.get_tournament_weather(db_path, tournament_id, day)
+    if weather is None:
+        try:
+            weather = read_weather(fetch())
+        except Exception:
+            weather = {"rain": False, "hot": False}
+        db.save_tournament_weather(db_path, tournament_id, day, weather)
+    own = stands[player]
+    ranking = None
+    if day == RUN_DAYS + 1:
+        # Same calculation as tournament_ranking, from the stands already read.
+        ranking = []
+        for row in stands.values():
+            result = final_result({"cash": row["cash"], "stock": row["stock"]})
+            ranking.append({
+                "player": row["player"], "seat": row["seat"],
+                "final_cash": result["final_cash"], "stock_at_cost": result["stock_at_cost"],
+                "gain": result["gain"],
+            })
+        ranking.sort(key=lambda item: (-item["gain"], item["seat"]))
+    return {
+        "id": tournament["id"],
+        "name": tournament["name"],
+        "code": tournament["code"],
+        "organiser": tournament["organiser"],
+        "day": day,
+        "weather": weather,
+        "stand": {
+            "cash": own["cash"],
+            "ready": bool(own["ready"]),
+            "stock": own["stock"],
+            "price": own["price"],
+        },
+        "players": [
+            {"player": row["player"], "seat": row["seat"], "ready": bool(row["ready"])}
+            for row in sorted(stands.values(), key=lambda item: item["seat"])
+        ],
+        "upgrades": db.get_tournament_upgrades(db_path, tournament_id, player),
+        "ranking": ranking,
+    }
