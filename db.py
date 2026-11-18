@@ -1,5 +1,7 @@
 import os
 import sqlite3
+import threading
+import time
 from contextlib import contextmanager
 
 import libsql
@@ -184,13 +186,65 @@ def is_empty_local_database(conn):
     return count == 0
 
 
+# Turso connections kept for reuse, one set per thread (each player's script run has its own).
+# Opening a Turso connection is the slow part of a click, and one click calls the database
+# dozens of times, so the calls of one click share a single connection.
+_THREAD = threading.local()
+# A kept connection unused for longer than this is replaced, so a new click never starts on a
+# connection that Turso may have dropped while the player was idle.
+REUSE_SECONDS = 5
+
+
+def now():
+    return time.monotonic()
+
+
+def thread_connections():
+    if not hasattr(_THREAD, "connections"):
+        _THREAD.connections = {}
+    return _THREAD.connections
+
+
+def forget_connection(key):
+    # Close and forget this thread's kept connection for one database.
+    entry = thread_connections().pop(key, None)
+    if entry is not None:
+        try:
+            entry[0].close()
+        except Exception:
+            pass
+
+
+def forget_connections():
+    # Close and forget all of this thread's kept connections.
+    for key in list(thread_connections()):
+        forget_connection(key)
+
+
+def get_connection(db_path):
+    # Returns (connection, kept). Local SQLite: a new connection every time (kept is False,
+    # it is closed after the block). Turso: this thread's kept connection, or a new one.
+    key = str(db_path)
+    entry = thread_connections().get(key)
+    if entry is not None:
+        conn, last_used = entry
+        if now() - last_used <= REUSE_SECONDS:
+            return conn, True
+        forget_connection(key)
+    conn = connect(db_path)
+    if isinstance(conn, sqlite3.Connection):
+        return conn, False
+    thread_connections()[key] = (conn, now())
+    return conn, True
+
+
 @contextmanager
 def open_database(db_path):
     # One transaction: it is saved only if everything in the block succeeds.
-    # If libsql loses the network, nothing is saved and the error becomes
-    # "database unavailable". Other errors are not caught.
-    conn = connect(db_path)
+    # If libsql loses the network, nothing is saved, the kept connection is forgotten
+    # and the error becomes "database unavailable". Other errors are not caught.
     key = str(db_path)
+    conn, kept = get_connection(db_path)
     try:
         with conn:
             needs_tables = key not in _TABLES_READY or is_empty_local_database(conn)
@@ -200,12 +254,17 @@ def open_database(db_path):
         if needs_tables:
             # Only remembered after the whole block succeeded.
             _TABLES_READY.add(key)
+        if kept:
+            thread_connections()[key] = (conn, now())
     except ValueError as error:
         if is_network_error(error):
+            if kept:
+                forget_connection(key)
             raise DatabaseUnavailable(UNAVAILABLE_MESSAGE) from None
         raise
     finally:
-        conn.close()
+        if not kept:
+            conn.close()
 
 
 def get_tournament_by_code(db_path, code):
