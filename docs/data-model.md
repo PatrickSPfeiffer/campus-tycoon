@@ -173,3 +173,7 @@ PRIMARY KEY (tournament_id, day).
 The structure changed in feature 7, and old databases are not upgraded. Delete the local
 `data/game.db` and the old Turso tables before running the app; the tables are then
 created fresh.
+
+The running app creates the tables only once per database (see `open_database` in `db.py`):
+after deleting the Turso tables, reboot the app on Streamlit Cloud so they are created again.
+A deleted local `data/game.db` gets its tables back automatically.

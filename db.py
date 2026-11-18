@@ -169,16 +169,37 @@ def create_tables(conn):
     )
 
 
+# Databases whose tables this running app has already created (one entry per db_path).
+# Creating the tables costs about 10 round trips to Turso, so we do it once instead of on
+# every call. A new deploy or a reboot of the app starts with an empty set.
+_TABLES_READY = set()
+
+
+def is_empty_local_database(conn):
+    # A local SQLite file with no tables (new, or deleted since) always gets them.
+    # Turso connections are not checked here, so this costs no network round trip.
+    if not isinstance(conn, sqlite3.Connection):
+        return False
+    count = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table'").fetchone()[0]
+    return count == 0
+
+
 @contextmanager
 def open_database(db_path):
     # One transaction: it is saved only if everything in the block succeeds.
     # If libsql loses the network, nothing is saved and the error becomes
     # "database unavailable". Other errors are not caught.
     conn = connect(db_path)
+    key = str(db_path)
     try:
         with conn:
-            create_tables(conn)
+            needs_tables = key not in _TABLES_READY or is_empty_local_database(conn)
+            if needs_tables:
+                create_tables(conn)
             yield conn
+        if needs_tables:
+            # Only remembered after the whole block succeeded.
+            _TABLES_READY.add(key)
     except ValueError as error:
         if is_network_error(error):
             raise DatabaseUnavailable(UNAVAILABLE_MESSAGE) from None
