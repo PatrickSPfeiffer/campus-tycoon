@@ -833,6 +833,21 @@ def my_tournaments(db_path, player):
     return db.get_player_stands(db_path, player)
 
 
+def tournament_list(db_path, player):
+    """Tournaments the player joined or organises, each once, by id; playing = has a stand."""
+    check_player(player)
+    rows = []
+    joined = set()
+    for stand in db.get_player_stands(db_path, player):
+        rows.append(dict(stand, playing=True))
+        joined.add(stand["id"])
+    for tournament in db.get_organised_tournaments(db_path, player):
+        if tournament["id"] not in joined:
+            rows.append(dict(tournament, playing=False))
+    rows.sort(key=lambda row: row["id"])
+    return rows
+
+
 def tournament_screen(db_path, player, tournament_id, fetch):
     """Everything one tournament card shows, read with at most 5 statements once the weather is saved."""
     check_player(player)
@@ -840,7 +855,8 @@ def tournament_screen(db_path, player, tournament_id, fetch):
     if tournament is None:
         raise ValueError("Tournament was not found.")
     stands = db.get_tournament_stands(db_path, tournament_id)
-    if player not in stands:
+    # The organiser may watch and close days without playing (team brief).
+    if player not in stands and player != tournament["organiser"]:
         raise ValueError("You have not joined this tournament.")
     day = tournament["day"]
     weather = db.get_tournament_weather(db_path, tournament_id, day)
@@ -850,7 +866,7 @@ def tournament_screen(db_path, player, tournament_id, fetch):
         except Exception:
             weather = {"rain": False, "hot": False}
         db.save_tournament_weather(db_path, tournament_id, day, weather)
-    own = stands[player]
+    own = stands.get(player)
     ranking = None
     if day == RUN_DAYS + 1:
         # Same calculation as tournament_ranking, from the stands already read.
@@ -870,7 +886,8 @@ def tournament_screen(db_path, player, tournament_id, fetch):
         "organiser": tournament["organiser"],
         "day": day,
         "weather": weather,
-        "stand": {
+        # None for an organiser who does not play.
+        "stand": None if own is None else {
             "cash": own["cash"],
             "ready": bool(own["ready"]),
             "stock": own["stock"],
@@ -880,7 +897,7 @@ def tournament_screen(db_path, player, tournament_id, fetch):
             {"player": row["player"], "seat": row["seat"], "ready": bool(row["ready"])}
             for row in sorted(stands.values(), key=lambda item: item["seat"])
         ],
-        "upgrades": db.get_tournament_upgrades(db_path, tournament_id, player),
+        "upgrades": [] if own is None else db.get_tournament_upgrades(db_path, tournament_id, player),
         "ranking": ranking,
         "days": group_day_results(db.get_tournament_results(db_path, tournament_id)),
     }

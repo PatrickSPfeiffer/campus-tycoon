@@ -542,6 +542,17 @@ def get_tournament_results(db_path, tournament_id):
     ]
 
 
+def get_organised_tournaments(db_path, organiser):
+    # Tournaments this player created, also when they do not play in them
+    # (specs/feature-fixes-after-live-test.md).
+    with open_database(db_path) as conn:
+        rows = conn.execute(
+            "SELECT id, name, code, day FROM tournaments WHERE organiser = ? ORDER BY id",
+            (organiser,),
+        ).fetchall()
+    return [{"id": row[0], "name": row[1], "code": row[2], "day": row[3]} for row in rows]
+
+
 def get_tournament_ranking_rows(db_path, tournament_id):
     with open_database(db_path) as conn:
         rows = conn.execute(
