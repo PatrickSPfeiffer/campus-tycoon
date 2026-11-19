@@ -15,7 +15,6 @@ We never see or store your Google password: sign-in is handled by Google.
 ## Services we use
 - Turso stores the game data.
 - When a practice run ends, the game emails you your result from the team's Gmail account. The email goes only to you.
-- The AI advisor sends only your game numbers (day, cash, stock and prices) to OpenRouter. It never sends your email or your name.
 - The weather comes from Open-Meteo. No data about you is sent.
 
 Your data is not sold or used for advertising.

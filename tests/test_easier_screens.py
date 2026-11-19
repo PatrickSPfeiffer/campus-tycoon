@@ -116,5 +116,5 @@ def test_practice_has_more_options_expanders():
         if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "expander"
         and node.args and isinstance(node.args[0], ast.Constant)
     ]
-    for label in ("AI business advisor", "Loan", "New run"):
+    for label in ("Loan", "New run"):
         assert label in labels
