@@ -291,16 +291,40 @@ def app_tree():
     return ast.parse(pathlib.Path("app.py").read_text(encoding="utf-8"))
 
 
-def test_tabs_run_only_when_open():
-    calls = [
-        node for node in ast.walk(app_tree())
+SCREEN_PAGES = {"practice_screen": "practice", "tournaments_screen": "tournaments", "help_screen": "help"}
+
+
+def calls_inside_branch(tree, page):
+    # Every call found in the body of an `if ... == "<page>"` branch.
+    found = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.If) and isinstance(node.test, ast.Compare)
+            and [type(op) for op in node.test.ops] == [ast.Eq]
+            and any(isinstance(side, ast.Constant) and side.value == page
+                    for side in [node.test.left, *node.test.comparators])
+        ):
+            for statement in node.body:
+                found.update(id(inner) for inner in ast.walk(statement) if isinstance(inner, ast.Call))
+    return found
+
+
+def test_only_the_open_screen_is_built():
+    tree = app_tree()
+    tabs_calls = [
+        node for node in ast.walk(tree)
         if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "tabs"
     ]
-    assert calls
-    for call in calls:
-        options = {keyword.arg: keyword.value for keyword in call.keywords}
-        assert isinstance(options.get("on_change"), ast.Constant)
-        assert options["on_change"].value == "rerun"
+    assert tabs_calls == []
+    for screen, page in SCREEN_PAGES.items():
+        screen_calls = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == screen
+        ]
+        assert screen_calls, f"{screen} is never called"
+        inside = calls_inside_branch(tree, page)
+        for call in screen_calls:
+            assert id(call) in inside, f"{screen} is called outside the branch for page {page!r}"
 
 
 def test_practice_and_tournament_card_are_fragments():
