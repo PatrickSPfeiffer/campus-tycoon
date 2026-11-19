@@ -104,7 +104,7 @@ def product_card(name, stats, footer, key=None):
 def inject_css():
     st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-:root { --bg1:#2A1A12; --glow1:#7A3B16; --glow2:#C2410C; --amber:#F5A524; --orange:#FF7A18; --text:#F6EBDD; --muted:#C9B8A6; --card:rgba(255,255,255,0.06); --card-border:rgba(255,255,255,0.10); --good:#4ADE80; --bad:#F87171; }
+:root { --bg1:#2A1A12; --glow1:#7A3B16; --glow2:#C2410C; --amber:#F5A524; --orange:#FF7A18; --teal:#5EEAD4; --text:#F6EBDD; --muted:#C9B8A6; --card:rgba(255,255,255,0.06); --card-border:rgba(255,255,255,0.10); --good:#4ADE80; --bad:#F87171; }
 html { font-size:15px; }
 html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 .stApp { background: radial-gradient(circle at 8% 7%, rgba(245,165,36,.55) 0, transparent 30%), radial-gradient(circle at 92% 24%, rgba(255,122,24,.45) 0, transparent 27%), radial-gradient(circle at 8% 88%, rgba(194,65,12,.45) 0, transparent 32%), radial-gradient(circle at 88% 82%, rgba(94,234,212,.18) 0, transparent 22%), radial-gradient(circle at 52% 14%, rgba(255,236,210,.12) 0, transparent 24%), linear-gradient(180deg, #43291C 0%, #2A1A12 52%, #20130D 100%); background-attachment:fixed; color:var(--text); }
@@ -164,8 +164,61 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 .hero .app-icon { vertical-align:baseline; }
 .hero .app-icon { width:44px !important; height:44px !important; }
 .st-key-signed_in_row [data-testid="stButton"] button { white-space:nowrap; }
-.day-steps { margin:.6rem 0 .4rem; color:var(--muted); font-size:.95rem; }
-.day-steps b { display:inline-flex; align-items:center; justify-content:center; width:1.4rem; height:1.4rem; margin:0 .2rem; border-radius:50%; background:linear-gradient(135deg,var(--amber),var(--orange)); color:#2B1608; font-size:.8rem; }
+.part-heading { display:flex; align-items:center; gap:10px; color:var(--amber); font-size:1.35rem; font-weight:800; margin:.1rem 0 .4rem; }
+.part-heading b { display:inline-flex; align-items:center; justify-content:center; width:1.8rem; height:1.8rem; border-radius:50%; background:linear-gradient(135deg,var(--amber),var(--orange)); color:#2B1608; font-size:.95rem; }
+[class*="st-key-practice_part_"] { box-sizing:border-box; padding:20px 22px 22px !important; height:auto !important; overflow:visible !important; }
+[class*="st-key-practice_part_"]:hover { transform:none !important; }
+.st-key-practice_part_money [data-testid="stHorizontalBlock"] { align-items:stretch !important; }
+.st-key-practice_part_money [data-testid="stColumn"] > [data-testid="stVerticalBlock"], .st-key-practice_part_money [data-testid="stColumn"] > div { height:100%; }
+[class*="st-key-practice_box_"] { box-sizing:border-box; height:100% !important; min-height:12.5rem; padding:16px !important; }
+.money-label { color:var(--muted); font-size:.85rem; }
+.money-value { color:var(--text); font-size:1.7rem; font-weight:800; line-height:1.2; margin:.3rem 0; }
+.money-note { color:var(--muted); font-size:.85rem; }
+.plan-heading { font-size:1.05rem; font-weight:800; padding:6px 12px; border-radius:10px; }
+.plan-heading-buy { color:var(--teal); background:rgba(94,234,212,.10); border:1px solid rgba(94,234,212,.35); }
+.plan-heading-sell { color:var(--amber); background:rgba(245,165,36,.10); border:1px solid rgba(245,165,36,.35); }
+.st-key-practice_plan_headings :is([data-testid="stElementContainer"], [data-testid="stMarkdown"], [data-testid="stMarkdownContainer"]) { margin:0 !important; }
+.st-key-practice_plan_headings [data-testid="stMarkdownContainer"] :is(p, div) { margin:0 !important; }
+:is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) { box-sizing:border-box; height:calc(4.3rem + 22px) !important; padding:10px 12px !important; border-radius:14px !important; overflow:hidden; }
+[class*="st-key-practice_buy_side_"] { background:rgba(94,234,212,.06) !important; border:1px solid rgba(94,234,212,.25) !important; }
+[class*="st-key-practice_sell_side_"] { background:rgba(245,165,36,.06) !important; border:1px solid rgba(245,165,36,.25) !important; }
+:is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) :is([data-testid="stElementContainer"], [data-testid="stMarkdown"], [data-testid="stMarkdownContainer"], [data-testid="stNumberInput"]) { margin:0 !important; }
+:is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) [data-testid="stMarkdownContainer"] :is(p, div) { margin:0 !important; }
+:is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { gap:.4rem !important; }
+:is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"] { display:none !important; }
+:is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) :is([data-testid="stNumberInput"], [data-testid="stNumberInputContainer"]) { height:2.5rem !important; min-height:2.5rem; }
+:is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) [data-testid="stElementContainer"]:has(.plan-label) { height:1.4rem; }
+.plan-product { display:flex; align-items:center; gap:8px; height:4.3rem; }
+.plan-product-name { font-weight:800; font-size:1.05rem; line-height:1.2; }
+.plan-product-stock { color:var(--muted); font-size:.85rem; line-height:1.2; }
+.plan-label { display:flex; align-items:center; height:1.4rem; color:var(--muted); font-size:.8rem; font-weight:600; line-height:1; white-space:nowrap; }
+.plan-text { display:flex; align-items:center; height:2.5rem; padding:0 2px; font-size:1.05rem; font-weight:800; line-height:1; }
+[class*="st-key-practice_buy_side_"] .plan-text { color:var(--teal); }
+[class*="st-key-practice_sell_side_"] .plan-text { color:var(--amber); }
+[class*="st-key-practice_sell_side_"] .plan-text-plain { color:var(--text); }
+.plan-rule { color:var(--muted); font-size:.95rem; line-height:1.4; margin:0; }
+.plan-rule b { color:var(--text); font-weight:800; }
+.plan-rule-icon { margin-right:.3rem; }
+[data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] .plan-rule), [data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] .plan-rule) :is([data-testid="stMarkdown"], [data-testid="stMarkdownContainer"]) { margin:0 !important; }
+.plan-arrow { display:flex; align-items:center; justify-content:center; height:2.5rem; color:var(--muted); font-size:1.5rem; font-weight:800; }
+.st-key-practice_buy_button button { border-color:rgba(94,234,212,.6) !important; }
+.st-key-practice_buy_button button:hover { background:rgba(94,234,212,.16) !important; border-color:var(--teal) !important; box-shadow:0 0 18px rgba(94,234,212,.22) !important; }
+.st-key-practice_buy_button button span, .st-key-practice_buy_button button svg { color:var(--teal) !important; fill:var(--teal) !important; }
+.st-key-practice_part_trade { border:2px solid var(--orange) !important; box-shadow:0 0 0 4px rgba(255,122,24,.12),0 0 40px rgba(255,122,24,.40),0 12px 32px rgba(0,0,0,.30) !important; }
+.st-key-practice_part_trade:hover { border-color:var(--orange) !important; }
+.st-key-practice_part_trade .part-heading { color:var(--orange); }
+.trade-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:.2rem 0 .6rem; }
+.st-key-practice_trade_day_button button { min-height:3.75rem; box-shadow:0 0 26px rgba(255,122,24,.45); }
+.st-key-practice_trade_day_button button p { font-size:1.3rem !important; font-weight:800 !important; }
+@media (max-width:640px) {
+  .trade-stats { grid-template-columns:1fr; }
+  .st-key-practice_plan_headings, .plan-arrow { display:none; }
+  [class*="st-key-practice_box_"] { min-height:0; }
+  :is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) { height:auto !important; overflow:visible; }
+  .plan-product { height:auto; }
+  [class*="st-key-practice_buy_side_"]::before { content:"Buy from the supplier"; color:var(--teal); font-weight:800; }
+  [class*="st-key-practice_sell_side_"]::before { content:"Sell to customers"; color:var(--amber); font-weight:800; }
+}
 .hero-compact { padding:14px 24px; text-align:left; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
 .hero-compact h1 { font-size:1.9rem; }
 .hero-compact .app-icon { width:30px !important; height:30px !important; }
@@ -265,17 +318,79 @@ with col2:
 
 
 
-def forget_practice_prices():
-    # The price fields remember what was typed; after a new run they must show the new prices.
-    for name in logic.PRODUCTS:
-        st.session_state.pop(f"practice_price_{name}", None)
+def euros(amount):
+    # A loss shows as -€5.00, not €-5.00.
+    return f"-€{abs(amount):.2f}" if amount < 0 else f"€{amount:.2f}"
+
+
+def money_box(label, value, note):
+    st.markdown(
+        f'<div class="money-label">{html.escape(label)}</div>'
+        f'<div class="money-value">{html.escape(str(value))}</div>'
+        f'<div class="money-note">{html.escape(note)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def plan_label(text, help=None):
+    # The same small label above every value in a product line, so all labels sit on one row.
+    st.markdown(f'<div class="plan-label">{html.escape(text)}</div>', unsafe_allow_html=True, help=help, width="content")
+
+
+def plan_value(value, plain=False):
+    # Plain text as tall as a number input, so it lines up with the fields but does not look editable.
+    # plain=True: the normal text colour instead of the side's colour (teal or amber).
+    css_class = "plan-text plan-text-plain" if plain else "plan-text"
+    st.markdown(f'<div class="{css_class}">{html.escape(str(value))}</div>', unsafe_allow_html=True)
+
+
+def changed_prices(typed, saved):
+    # The typed selling prices that differ from the saved ones, rounded to cents.
+    return {
+        name: round(float(value), 2)
+        for name, value in typed.items()
+        if round(float(value), 2) != saved[name]
+    }
+
+
+def part_heading(number, text):
+    st.markdown(
+        f'<div class="part-heading"><b>{number}</b> {html.escape(text)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def show_practice_day(result):
+    with st.container(border=True, key=f"practice_result_day_{result['day']}"):
+        st.markdown(f'### Day {result["day"]}')
+        rows = []
+        for name, line in list(result["by_product"].items()) + [("Total", result["total"])]:
+            rows.append(
+                {
+                    "Product": name,
+                    "Units sold": line["units_sold"],
+                    "Revenue": f"€{line['revenue']:.2f}",
+                    "COGS": f"€{line['cogs']:.2f}",
+                    "Gross profit": f"€{line['gross_profit']:.2f}",
+                }
+            )
+        st.table(rows)
+
+
+# Part 2 column widths: buy side | arrow | sell side. Headings, lines and buttons use the same widths.
+PLAN_SIDES = [3.3, 0.35, 3]
 
 
 # The Practice screen is a fragment: its buttons rerun only this screen, not the whole app.
+# Top to bottom (specs/feature-practice-layout.md): New run bar, 1 money, final result, 2 plan, 3 trade, results.
 @st.fragment
 def practice_screen():
-    if st.session_state.pop("reset_practice_prices", False):
-        forget_practice_prices()
+    # Removing a form widget's key does not reset it: the browser sends the old value again.
+    # A new round number gives the widget a new key, so it really starts again from its value.
+    # buy round: +1 after every successful buy, trade and new run (How many back to 0).
+    # price round: +1 after a new run (selling prices back to the new run's prices).
+    buy_round = st.session_state.get("practice_buy_round", 0)
+    price_round = st.session_state.get("practice_price_round", 0)
     show_flash("practice")
     try:
         game = logic.load_game(DB_PATH, PLAYER)
@@ -283,15 +398,78 @@ def practice_screen():
         notice("error", friendly_error(error))
         return
     run_complete = logic.is_run_complete(game)
+    day_text = "(run complete)" if run_complete else f"day {game['day']}"
+    preview = logic.demand_preview(game)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Cash", f"€{game['cash']:.2f}")
-    if run_complete:
-        col2.metric("Progress", "Run complete")
-    else:
-        col2.metric("Progress", f"Day {game['day']} of {logic.RUN_DAYS}")
-    col3.metric("Loan to repay", f"€{game['debt']:.2f}")
-    st.caption(f"Level: {logic.level_name(game)} (started with €{game['start_cash']:.2f})")
+    # 0. New run bar
+    with st.container(border=True, key="practice_new_run_bar"):
+        level_column, button_column = st.columns([2, 3], vertical_alignment="bottom")
+        with level_column:
+            new_level = st.selectbox(
+                "Difficulty",
+                list(logic.DIFFICULTY_LEVELS),
+                index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
+                format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
+                key="new_run_level",
+            )
+        with button_column:
+            if not st.session_state.get("confirm_new_run"):
+                if st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:"):
+                    st.session_state["confirm_new_run"] = True
+                    st.rerun(scope="fragment")
+        if st.session_state.get("confirm_new_run"):
+            notice("warning", f"Start a new {new_level} run? The current run and its history will be lost.")
+            col1, col2 = st.columns(2)
+            if col1.button("Yes, start a new run", key="practice_confirm_new_run_button", icon=":material/check:"):
+                try:
+                    logic.new_run(DB_PATH, PLAYER, new_level)
+                    st.session_state["confirm_new_run"] = False
+                    # New keys for the price and How many fields, so they show the new run's prices and 0.
+                    st.session_state["practice_price_round"] = price_round + 1
+                    st.session_state["practice_buy_round"] = buy_round + 1
+                    st.rerun(scope="fragment")
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
+            if col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:"):
+                st.session_state["confirm_new_run"] = False
+                st.rerun(scope="fragment")
+
+    # 1. Your day and money: four boxes of the same size.
+    with st.container(border=True, key="practice_part_money"):
+        part_heading(1, "Your day and money")
+        cash_column, progress_column, debt_column, loan_column = st.columns(4)
+        with cash_column:
+            with st.container(border=True, key="practice_box_cash"):
+                money_box("Cash", f"€{game['cash']:.2f}", f"Started with €{game['start_cash']:.2f}")
+        with progress_column:
+            with st.container(border=True, key="practice_box_progress"):
+                progress = "Run complete" if run_complete else f"Day {game['day']} of {logic.RUN_DAYS}"
+                money_box("Progress", progress, f"Level: {logic.level_name(game)}")
+        with debt_column:
+            with st.container(border=True, key="practice_box_debt"):
+                money_box(
+                    "Loan to repay", f"€{game['debt']:.2f}",
+                    "Paid back from your final gain" if game["debt"] > 0 else "No loan taken",
+                )
+        with loan_column:
+            with st.container(border=True, key="practice_box_loan"):
+                has_loan = game["debt"] > 0
+                loan_amount = st.number_input(
+                    "Take a loan (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
+                    key="loan_amount",
+                    help=(
+                        f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
+                        f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
+                    ),
+                )
+                st.caption(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
+                if st.button("Take loan", key="practice_loan_button", icon=":material/account_balance_wallet:", disabled=run_complete or has_loan, use_container_width=True):
+                    try:
+                        logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
+                        flash("practice", "Loan taken.", kind="toast")
+                        st.rerun(scope="fragment")
+                    except (ValueError, db.DatabaseUnavailable) as error:
+                        notice("error", friendly_error(error))
 
     if run_complete:
         final = logic.final_result(game)
@@ -309,74 +487,99 @@ def practice_screen():
         elif email_status == "failed":
             notice("warning", "We could not send the email, but your result is saved.")
 
-    section_heading("cart", "Products")
-    if not run_complete:
-        preview = logic.demand_preview(game)
-
-    product_columns = st.columns(3)
-    for index, (name, details) in enumerate(logic.PRODUCTS.items()):
-        with product_columns[index % 3]:
-            stat_items = [("Stock", game['stock'][name]), ("Price", f"€{game['price'][name]:.2f}")]
-            if not run_complete:
-                stat_items.extend([("Demand", preview[name]['demand']), ("Will sell", preview[name]['will_sell'])])
-            product_card(
-                name, stat_items,
-                f"Unit cost: €{details['unit_cost']:.2f} · Reference price: €{details['reference_price']:.2f}",
+    # Parts 2 and 3 are one form: typing reruns nothing until a button is pressed, and the
+    # Trade button can see quantities and prices that were typed but not yet bought or saved.
+    # enter_to_submit=False: Enter in a field never presses Buy, Save or Trade by itself.
+    with st.form("practice_day_form", border=False, enter_to_submit=False):
+        # 2. Plan the day: buy side (teal) and sell side (amber), one line per product.
+        with st.container(border=True, key="practice_part_plan"):
+            part_heading(2, f"Plan {day_text}")
+            # The demand rule stays visible (brief CT03), so players can choose a price with it.
+            st.markdown(
+                '<div class="plan-rule"><span class="plan-rule-icon">💡</span>Customers per day: '
+                "<b>10</b> at or below the reference price · <b>5</b> up to twice it · <b>0</b> above that.</div>",
+                unsafe_allow_html=True,
             )
-    st.caption(
-        "Demand per product per day: 10 units at or below its reference price, "
-        "5 units up to twice the reference price, 0 units above that."
-    )
-
-    st.markdown(
-        '<div class="day-steps">Each day: <b>1</b> Buy stock · <b>2</b> Set prices · <b>3</b> Trade one day</div>',
-        unsafe_allow_html=True,
-    )
-    action_columns = st.columns(2)
-    with action_columns[0]:
-        with st.container(border=True, key="action_buy"):
-            section_heading("cart", "Buy stock")
-            # clear_on_submit puts every quantity back to 0 after buying.
-            with st.form("practice_buy_form", border=False, clear_on_submit=True):
-                quantities = {}
-                for name, details in logic.PRODUCTS.items():
-                    quantities[name] = st.number_input(
-                        f"{name} (€{details['unit_cost']:.2f} each)", min_value=0, step=1, value=0,
-                        key=f"practice_buy_{name}",
-                    )
+            with st.container(key="practice_plan_headings"):
+                buy_heading, _, sell_heading = st.columns(PLAN_SIDES)
+                buy_heading.markdown('<div class="plan-heading plan-heading-buy">Buy from the supplier</div>', unsafe_allow_html=True)
+                sell_heading.markdown('<div class="plan-heading plan-heading-sell">Sell to customers</div>', unsafe_allow_html=True)
+            quantities = {}
+            new_prices = {}
+            for name, details in logic.PRODUCTS.items():
+                reference = details["reference_price"]
+                # One row per product: buy box, arrow, sell box side by side, both boxes the same fixed height.
+                # Inside a box every value column is a label (fixed height) above a value (2.5rem), aligned at the top.
+                with st.container(key=f"practice_line_{name}"):
+                    buy_side, arrow, sell_side = st.columns(PLAN_SIDES, vertical_alignment="center")
+                    with buy_side:
+                        with st.container(key=f"practice_buy_side_{name}"):
+                            name_column, cost_column, quantity_column = st.columns([1.3, 1, 1], vertical_alignment="top")
+                            name_column.markdown(
+                                f'<div class="plan-product">{icon(PRODUCT_ICONS.get(name, "box"))}'
+                                f'<div><div class="plan-product-name">{html.escape(name)}</div>'
+                                f'<div class="plan-product-stock">{game["stock"][name]} in stock</div></div></div>',
+                                unsafe_allow_html=True,
+                            )
+                            with cost_column:
+                                plan_label("Supplier price")
+                                plan_value(f"€{details['unit_cost']:.2f}")
+                            with quantity_column:
+                                plan_label("How many")
+                                quantities[name] = st.number_input(
+                                    f"How many {name}", min_value=0, step=1, value=0,
+                                    key=f"practice_buy_{name}_{buy_round}", disabled=run_complete,
+                                    label_visibility="collapsed",
+                                )
+                    arrow.markdown('<div class="plan-arrow">→</div>', unsafe_allow_html=True)
+                    with sell_side:
+                        with st.container(key=f"practice_sell_side_{name}"):
+                            reference_column, price_column, sells_column = st.columns(3, vertical_alignment="top")
+                            with reference_column:
+                                plan_label("Reference price")
+                                plan_value(f"€{reference:.2f}", plain=True)
+                            with price_column:
+                                plan_label(
+                                    "Your selling price (€)",
+                                    help=(
+                                        f"Up to €{reference:.2f}: 10 customers a day. Up to €{2 * reference:.2f}: 5. "
+                                        "Above that: none."
+                                    ),
+                                )
+                                new_prices[name] = st.number_input(
+                                    f"Your selling price for {name} (€)", min_value=0.01, max_value=logic.MAX_PRICE,
+                                    step=0.01, value=game["price"][name], format="%.2f", key=f"practice_price_{name}_{price_round}",
+                                    disabled=run_complete, label_visibility="collapsed",
+                                )
+                            with sells_column:
+                                plan_label("Will sell")
+                                plan_value(preview[name]["will_sell"])
+            buy_button_column, _, save_button_column = st.columns(PLAN_SIDES)
+            with buy_button_column:
                 buy_submitted = st.form_submit_button(
-                    "Buy", icon=":material/shopping_cart:", disabled=run_complete, use_container_width=True,
+                    "Buy stock", key="practice_buy_button", icon=":material/shopping_cart:",
+                    disabled=run_complete, use_container_width=True,
                 )
+            with save_button_column:
+                prices_submitted = st.form_submit_button(
+                    "Save selling prices", key="practice_save_prices_button", icon=":material/sell:",
+                    disabled=run_complete, use_container_width=True,
+                )
+
+            # Each button does only its own job.
             if buy_submitted:
                 order = {name: int(value) for name, value in quantities.items()}
                 try:
                     logic.buy_many(DB_PATH, PLAYER, order)
                     flash("practice", f"Stock bought for €{logic.order_cost({n: q for n, q in order.items() if q > 0}):.2f}.", kind="toast")
+                    st.session_state["practice_buy_round"] = buy_round + 1
+                    if changed_prices(new_prices, game["price"]):
+                        st.session_state["practice_prices_not_saved"] = True
                     st.rerun(scope="fragment")
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
-
-
-    with action_columns[1]:
-        with st.container(border=True, key="action_price"):
-            section_heading("trending-up", "Selling prices")
-            # A form: typing a price reruns nothing until the button is pressed.
-            with st.form("practice_price_form", border=False):
-                new_prices = {}
-                for name in logic.PRODUCTS:
-                    new_prices[name] = st.number_input(
-                        f"{name} (€)", min_value=0.01, max_value=logic.MAX_PRICE, step=0.01,
-                        value=game["price"][name], format="%.2f", key=f"practice_price_{name}",
-                    )
-                prices_submitted = st.form_submit_button(
-                    "Set prices", icon=":material/sell:", disabled=run_complete, use_container_width=True,
-                )
             if prices_submitted:
-                changed = {
-                    name: round(float(value), 2)
-                    for name, value in new_prices.items()
-                    if round(float(value), 2) != game["price"][name]
-                }
+                changed = changed_prices(new_prices, game["price"])
                 if not changed:
                     notice("info", "No price changed.")
                 else:
@@ -386,81 +589,55 @@ def practice_screen():
                         st.rerun(scope="fragment")
                     except (ValueError, db.DatabaseUnavailable) as error:
                         notice("error", friendly_error(error))
+            if st.session_state.pop("practice_prices_not_saved", False):
+                notice("info", "Your new selling prices are not saved yet. Press Save selling prices.")
 
-
-    if not run_complete:
-        # Hints only: the player can still trade (specs/feature-easier-screens.md).
-        for warning in logic.trade_warnings(game["stock"], game["price"]):
-            notice("warning", warning)
-
-    if st.button("Trade one day", key="practice_trade_day_button", disabled=run_complete, type="primary", use_container_width=True, icon=":material/play_arrow:"):
-        try:
-            logic.trade_day(DB_PATH, PLAYER)
-            game = logic.load_game(DB_PATH, PLAYER)
-            if logic.is_run_complete(game):
-                with st.spinner("Sending your result by email..."):
-                    st.session_state["email_status"] = mailer.send_result_email(
-                        PLAYER, logic.final_result(game)
-                    )
-            st.rerun(scope="fragment")
-        except (ValueError, db.DatabaseUnavailable) as error:
-            notice("error", friendly_error(error))
-
-
-    section_heading("box", "More options")
-    option_columns = st.columns(3)
-    with option_columns[1]:
-        with st.expander("Loan"):
-            st.caption(
-                f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
-                f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
+        # 3. Trade the day: the most visible part.
+        with st.container(border=True, key="practice_part_trade"):
+            part_heading(3, f"Trade {day_text}")
+            will_sell = sum(line["will_sell"] for line in preview.values())
+            profit = logic.expected_profit(game)["total"]
+            days_left = 0 if run_complete else logic.RUN_DAYS - game["day"]
+            st.markdown(
+                '<div class="trade-stats">'
+                f'<div class="stat-box"><div class="stat-label">Will sell</div><div class="stat-value">{will_sell} units</div></div>'
+                f'<div class="stat-box"><div class="stat-label">Expected profit</div><div class="stat-value">{euros(profit)}</div></div>'
+                f'<div class="stat-box"><div class="stat-label">Days left after this day</div><div class="stat-value">{days_left}</div></div>'
+                '</div>',
+                unsafe_allow_html=True,
             )
-            has_loan = game["debt"] > 0
-            if has_loan:
-                st.write(f"Loan taken: you owe €{game['debt']:.2f}.")
-            loan_amount = st.number_input(
-                "Amount (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
-                key="loan_amount",
+            if not run_complete:
+                # Hints only: the player can still trade (specs/feature-easier-screens.md).
+                for warning in logic.trade_warnings(game["stock"], game["price"]):
+                    notice("warning", warning)
+            trade_label = "Run complete" if run_complete else f"Trade day {game['day']}"
+            trade_submitted = st.form_submit_button(
+                trade_label, key="practice_trade_day_button", type="primary", icon=":material/play_arrow:",
+                disabled=run_complete, use_container_width=True,
             )
-            st.write(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
-            if st.button("Take loan", key="practice_loan_button", icon=":material/account_balance_wallet:", disabled=run_complete or has_loan, use_container_width=True):
-                try:
-                    logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
-                    flash("practice", "Loan taken.", kind="toast")
-                    st.rerun(scope="fragment")
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
-
-    with option_columns[2]:
-        with st.expander("New run", expanded=run_complete):
-            new_level = st.selectbox(
-                "Difficulty",
-                list(logic.DIFFICULTY_LEVELS),
-                index=list(logic.DIFFICULTY_LEVELS).index("Normal"),
-                format_func=lambda name: f"{name} (€{logic.DIFFICULTY_LEVELS[name]:.0f} to start)",
-                key="new_run_level",
-            )
-            if not st.session_state.get("confirm_new_run"):
-                if st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:"):
-                    st.session_state["confirm_new_run"] = True
-                    st.rerun(scope="fragment")
-            else:
-                notice("warning", f"Start a new {new_level} run? The current run and its history will be lost.")
-                col1, col2 = st.columns(2)
-                if col1.button("Yes, start a new run", key="practice_confirm_new_run_button", icon=":material/check:"):
+            if trade_submitted:
+                # Typed but not bought or saved: the day is not traded, so nothing is lost by surprise.
+                typed_quantities = any(int(value) > 0 for value in quantities.values())
+                unsaved_prices = bool(changed_prices(new_prices, game["price"]))
+                if typed_quantities:
+                    notice("warning", "You typed quantities but did not buy them. Press Buy stock first, or set How many to 0.")
+                if unsaved_prices:
+                    notice("warning", "Your new selling prices are not saved yet. Press Save selling prices first.")
+                if not typed_quantities and not unsaved_prices:
                     try:
-                        logic.new_run(DB_PATH, PLAYER, new_level)
-                        st.session_state["confirm_new_run"] = False
-                        # The price fields are already drawn in this run, so clear them at the next one.
-                        st.session_state["reset_practice_prices"] = True
+                        logic.trade_day(DB_PATH, PLAYER)
+                        game = logic.load_game(DB_PATH, PLAYER)
+                        if logic.is_run_complete(game):
+                            with st.spinner("Sending your result by email..."):
+                                st.session_state["email_status"] = mailer.send_result_email(
+                                    PLAYER, logic.final_result(game)
+                                )
+                        st.session_state["practice_buy_round"] = buy_round + 1
                         st.rerun(scope="fragment")
                     except (ValueError, db.DatabaseUnavailable) as error:
                         notice("error", friendly_error(error))
-                if col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:"):
-                    st.session_state["confirm_new_run"] = False
-                    st.rerun(scope="fragment")
 
-
+    # 4. Results: the latest day stays visible, the rest folds away.
     section_heading("trending-up", "Results")
     try:
         results = logic.get_results(DB_PATH, PLAYER)
@@ -468,44 +645,32 @@ def practice_screen():
         notice("error", friendly_error(error))
         results = []
 
-    # History charts: built only from this player's own saved results.
-    chart_data = logic.profit_chart_data(results)
-    if chart_data["Day"]:
-        chart_data["Day"] = [f"Day {day}" for day in chart_data["Day"]]
-        chart_col1, chart_col2 = st.columns(2)
-        with chart_col1:
-            with st.container(border=True):
-                st.write("Gross profit per day by product")
-                st.bar_chart(
-                    chart_data, x="Day", y=list(logic.PRODUCTS), stack=False,
-                    color=["#F5A524", "#FF7A18", "#5EEAD4"],
-                    x_label="Day", y_label="Gross profit (€)",
-                )
-        with chart_col2:
-            with st.container(border=True):
-                st.write("Total gross profit per day")
-                st.bar_chart(
-                    chart_data, x="Day", y="Total", color="#F5A524",
-                    x_label="Day", y_label="Gross profit (€)",
-                )
+    if not results:
+        notice("info", "Trade a day to see your results.")
     else:
-        notice("info", "Trade a day to see your charts.")
-
-    for result in reversed(results):
-        with st.container(border=True, key=f"practice_result_day_{result['day']}"):
-            st.markdown(f'### Day {result["day"]}')
-            rows = []
-            for name, line in list(result["by_product"].items()) + [("Total", result["total"])]:
-                rows.append(
-                    {
-                        "Product": name,
-                        "Units sold": line["units_sold"],
-                        "Revenue": f"€{line['revenue']:.2f}",
-                        "COGS": f"€{line['cogs']:.2f}",
-                        "Gross profit": f"€{line['gross_profit']:.2f}",
-                    }
-                )
-            st.table(rows)
+        show_practice_day(results[-1])
+        with st.expander("Charts and all days"):
+            # History charts: built only from this player's own saved results.
+            chart_data = logic.profit_chart_data(results)
+            chart_data["Day"] = [f"Day {day}" for day in chart_data["Day"]]
+            chart_col1, chart_col2 = st.columns(2)
+            with chart_col1:
+                with st.container(border=True):
+                    st.write("Gross profit per day by product")
+                    st.bar_chart(
+                        chart_data, x="Day", y=list(logic.PRODUCTS), stack=False,
+                        color=["#F5A524", "#FF7A18", "#5EEAD4"],
+                        x_label="Day", y_label="Gross profit (€)",
+                    )
+            with chart_col2:
+                with st.container(border=True):
+                    st.write("Total gross profit per day")
+                    st.bar_chart(
+                        chart_data, x="Day", y="Total", color="#F5A524",
+                        x_label="Day", y_label="Gross profit (€)",
+                    )
+            for result in reversed(results[:-1]):
+                show_practice_day(result)
 
     if run_complete:
         st.download_button(

@@ -109,12 +109,17 @@ def test_app_uses_the_new_helpers():
     assert {"trade_warnings", "stand_references", "split_tournaments"} <= called
 
 
-def test_practice_has_more_options_expanders():
-    labels = [
-        node.args[0].value
-        for node in ast.walk(ast.parse(app_source()))
-        if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "expander"
-        and node.args and isinstance(node.args[0], ast.Constant)
+def test_practice_still_offers_loan_and_new_run():
+    practice = next(
+        node for node in ast.walk(ast.parse(app_source()))
+        if isinstance(node, ast.FunctionDef) and node.name == "practice_screen"
+    )
+    button_keys = [
+        keyword.value.value
+        for node in ast.walk(practice)
+        if isinstance(node, ast.Call) and getattr(node.func, "attr", None) == "button"
+        for keyword in node.keywords
+        if keyword.arg == "key" and isinstance(keyword.value, ast.Constant)
     ]
-    for label in ("Loan", "New run"):
-        assert label in labels
+    for key in ("practice_loan_button", "practice_new_run_button"):
+        assert key in button_keys
