@@ -22,11 +22,14 @@ Examples:
 0. New run bar (first thing on the page): difficulty select, "Start a new run" button, and the same confirmation as today ("Yes, start a new run" / "Cancel"). Same keys as today.
 1. Part 1 "Your day and money": four boxes of the same width and height: Cash, Progress ("Day X of 5" or "Run complete", with the level), Loan to repay, and Take a loan (amount input, "You will owe €…", "Take loan" button; same rules, keys and disabled states as today).
    Final result block when the run is complete, as today.
-2. Part 2 "Plan day X": headings "Buy from the supplier" (teal) and "Sell to customers" (amber). One line per product: name and "N in stock" | Supplier price (unit cost) and "How many" input | arrow | "Your selling price" input and "Will sell" (from demand_preview). Labels and values aligned on every line.
+2. Part 2 "Plan day X": headings "Buy from the supplier" (teal) and "Sell to customers" (amber). One line per product: name and "N in stock" | Supplier price (unit cost) and "How many" input | arrow | Reference price | "Your selling price" input | "Will sell" (from demand_preview). Labels and values aligned on every line.
+   The demand rule is shown as a visible line (brief CT03), and each sell box shows the Reference price.
    All inputs are inside one form (no rerun while typing). Under the buy side: button "Buy stock" (buys the quantities, as today). Under the sell side: button "Save selling prices" (saves changed prices, as today). Each button does only its own job.
    After "Buy stock", if a typed selling price differs from the saved one, show: "Your new selling prices are not saved yet. Press Save selling prices."
    After a successful buy, the How many inputs go back to 0.
+   Widget keys: How many uses practice_buy_<product>_<round>, and the round goes up after every successful buy, trade and new run. Your selling price uses practice_price_<product>_<round>, and the round goes up after a new run. Why: a widget inside a form only resets when its key changes; removing the key from session state is not enough, because the browser sends the old value again.
 3. Part 3 "Trade day X": the most visible part (orange border and glow, big primary button "Trade day X"). Shows Will sell (total units from demand_preview), Expected profit (expected_profit total) and Days left after this day. The warnings from logic.trade_warnings appear inside this part. Trading does the same as today, including the result email at the end of the run.
+   The Trade button is part of the same form. If any How many is above 0, the day is not traded and the screen says: 'You typed quantities but did not buy them. Press Buy stock first, or set How many to 0.' If a typed selling price differs from the saved one, the day is not traded and the screen says: 'Your new selling prices are not saved yet. Press Save selling prices first.' After a successful trade, the How many inputs go back to 0.
 4. Results: the latest day table stays visible; the charts and older days go into an expander "Charts and all days". The CSV download stays when the run is complete.
 
 ## When the run is complete

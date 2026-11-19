@@ -95,6 +95,15 @@ def demand_preview(game):
     return preview
 
 
+def expected_profit(game):
+    """Profit if the preview comes true: will sell × (price − unit cost) per product. A loss is negative."""
+    by_product = {}
+    for product, line in demand_preview(game).items():
+        unit_cost = PRODUCTS[product]["unit_cost"]
+        by_product[product] = round(line["will_sell"] * (line["price"] - unit_cost), 2)
+    return {"by_product": by_product, "total": round(sum(by_product.values()), 2)}
+
+
 def check_product(product):
     if product not in PRODUCTS:
         raise ValueError(f"Unknown product: {product}.")
