@@ -149,14 +149,14 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 [class*="st-key-upgrade_tournament_"] [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"]:last-child { margin-bottom:0 !important; }
 [data-testid="stExpander"] details, [data-testid="stExpander"] summary, [data-testid="stExpander"] [data-testid="stExpanderDetails"] { border:none !important; background:transparent !important; box-shadow:none !important; border-radius:inherit !important; outline:none !important; }
 [data-testid="stExpander"] [data-testid="stExpanderDetails"] { border-top:0 !important; }
-[data-testid="stTabs"], [data-testid="stTabs"] > *, [data-testid="stTabs"] [role="tablist"], [data-testid="stTabs"] [role="tablist"] > *, [data-testid="stTabs"] [role="tablist"] > * > * { border:0 !important; border-bottom:0 !important; box-shadow:none !important; background:transparent !important; }
-[data-testid="stTabs"]:has([role="tablist"]), *:has(> [data-testid="stTabs"]) { border-bottom:0 !important; box-shadow:none !important; background:transparent !important; }
-[data-testid="stTabs"]::before, [data-testid="stTabs"]::after, [data-testid="stTabs"] > *::before, [data-testid="stTabs"] > *::after, [data-testid="stTabs"] [role="tablist"]::before, [data-testid="stTabs"] [role="tablist"]::after, [data-testid="stTabs"] [role="tablist"] > *::before, [data-testid="stTabs"] [role="tablist"] > *::after { content:none !important; display:none !important; }
-[data-testid="stTabs"]:has([role="tablist"])::before, [data-testid="stTabs"]:has([role="tablist"])::after, *:has(> [data-testid="stTabs"])::before, *:has(> [data-testid="stTabs"])::after { content:none !important; display:none !important; }
-[data-baseweb="tab-border"], [data-baseweb="tab-highlight"], [class*="TabBorder"], [class*="TabHighlight"], [class*="SelectionIndicator"] { display:none !important; height:0 !important; }
-[data-testid="stTabs"] [role="tablist"] { gap:10px; }
-[data-testid="stTab"] { border-radius:999px !important; padding:8px 20px !important; background:var(--card) !important; border:1px solid transparent !important; border-bottom:0 !important; box-shadow:none !important; }
-[data-testid="stTab"][aria-selected="true"] { background:linear-gradient(135deg,var(--amber),var(--orange)) !important; color:#2B1608 !important; }
+[class*="st-key-home_card_"] { box-sizing:border-box; padding:24px 22px 22px !important; }
+[class*="st-key-home_card_"] [data-testid="stElementContainer"], [class*="st-key-home_card_"] [data-testid="stMarkdownContainer"] { width:100% !important; }
+[class*="st-key-home_card_"] [data-testid="stElementContainer"]:last-child { margin-bottom:0 !important; }
+.home-card-body { display:flex; flex-direction:column; align-items:center; text-align:center; width:100%; margin-bottom:1rem; }
+.home-card-icon { display:flex; align-items:center; justify-content:center; width:64px; height:64px; border-radius:50%; background:rgba(245,165,36,.16); border:1px solid rgba(245,165,36,.35); }
+.home-card-title { color:var(--amber); font-size:1.5rem; font-weight:800; margin:.6rem 0 .2rem; }
+.home-card-text { color:var(--muted); font-size:1rem; line-height:1.4; min-height:2.8em; }
+@media (max-width:640px) { .home-card-text { min-height:0; } }
 [data-testid="stMetricValue"] { color:var(--text); font-weight:800; }
 [data-testid="stMetricLabel"] { color:var(--muted); }
 .hero { background:linear-gradient(135deg,rgba(245,165,36,.30),rgba(255,122,24,.10)); -webkit-backdrop-filter:blur(18px) saturate(140%); backdrop-filter:blur(18px) saturate(140%); border:1px solid rgba(245,165,36,.45); border-radius:22px; padding:32px 40px; margin-bottom:12px; box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -1px 0 rgba(255,255,255,.04),0 12px 32px rgba(0,0,0,.30); text-align:center; }
@@ -238,6 +238,8 @@ if not st.user.is_logged_in:
         show_hero()
         st.markdown('<div style="text-align:center">Welcome! Run a small campus shop for five days. Sign in to play.</div>', unsafe_allow_html=True)
         if st.button("Sign in with Google", key="sign_in_button", type="primary", icon=":material/login:", use_container_width=True):
+            # Right after signing in, the player starts on the home page.
+            st.query_params.clear()
             st.login()
         mini_columns = st.columns(3)
         for mini_column, glyph, caption in zip(mini_columns, ("cart", "trending-up", "trophy"), ("Buy stock", "Set prices", "Beat the market")):
@@ -864,23 +866,58 @@ def help_screen():
                 st.write(body)
 
 
-# on_change="rerun" makes the tabs remember which one is open, so only that one is built.
-practice_tab, tournament_tab, help_tab = st.tabs(
-    [
-        ":material/storefront: Practice",
-        ":material/emoji_events: Tournaments",
-        ":material/help: How to play",
-    ],
-    key="main_tab",
-    on_change="rerun",
-)
+# The home page cards: page value, icon, title, sentence, button icon.
+HOME_CARDS = [
+    ("practice", "coffee", "Practice", "Play a five-day run on your own", ":material/storefront:"),
+    ("tournaments", "trophy", "Tournaments", "Compete for the same customers with other players", ":material/emoji_events:"),
+    ("help", "info", "How to play", "The rules in two minutes", ":material/help:"),
+]
+PAGES = [card[0] for card in HOME_CARDS]
 
-if practice_tab.open:
-    with practice_tab:
-        practice_screen()
-if tournament_tab.open:
-    with tournament_tab:
-        tournaments_screen()
-if help_tab.open:
-    with help_tab:
-        help_screen()
+
+def open_page(page):
+    # The open screen lives in the address (?page=...), so a reload stays on it.
+    if page in PAGES:
+        st.query_params["page"] = page
+    else:
+        st.query_params.pop("page", None)
+
+
+def current_page():
+    # No value or an unknown value means the home page.
+    page = st.query_params.get("page", "home")
+    return page if page in PAGES else "home"
+
+
+def home_screen():
+    columns = st.columns(3)
+    for column, (page, glyph, title, text, button_icon) in zip(columns, HOME_CARDS):
+        with column:
+            with st.container(border=True, key=f"home_card_{page}"):
+                st.markdown(
+                    f'<div class="home-card-body"><div class="home-card-icon">{icon(glyph, 34)}</div>'
+                    f'<div class="home-card-title">{title}</div>'
+                    f'<div class="home-card-text">{text}</div></div>',
+                    unsafe_allow_html=True,
+                )
+                st.button(f"Open {title}", key=f"home_open_{page}", type="primary", icon=button_icon,
+                          use_container_width=True, on_click=open_page, args=(page,))
+
+
+def home_button():
+    st.button("Home", key="home_button", icon=":material/home:", on_click=open_page, args=("home",))
+
+
+# Only the open screen is built.
+page = current_page()
+if page == "practice":
+    home_button()
+    practice_screen()
+elif page == "tournaments":
+    home_button()
+    tournaments_screen()
+elif page == "help":
+    home_button()
+    help_screen()
+else:
+    home_screen()
