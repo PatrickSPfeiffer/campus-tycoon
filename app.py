@@ -1,6 +1,5 @@
 import streamlit as st
 
-import advisor
 import db
 import html
 import logic
@@ -410,28 +409,6 @@ def practice_screen():
 
     section_heading("box", "More options")
     option_columns = st.columns(3)
-    with option_columns[0]:
-        if not run_complete:
-            with st.expander("AI business advisor"):
-                if st.button("Ask the advisor", key="practice_advisor_button", icon=":material/psychology:"):
-                    api_key = st.secrets.get("OPENROUTER_API_KEY", "")
-                    advice = logic.get_advice(
-                        game,
-                        lambda prompt: advisor.ask_openrouter(prompt, api_key),
-                    )
-                    label = "AI suggestion" if advice["source"] == "ai" else "Basic tip (AI not available)"
-                    st.write(label)
-                    st.table(
-                        [
-                            {
-                                "Product": product,
-                                "Price": f"€{line['price']:.2f}",
-                                "Reason": line["reason"],
-                            }
-                            for product, line in advice["prices"].items()
-                        ]
-                    )
-
     with option_columns[1]:
         with st.expander("Loan"):
             st.caption(
