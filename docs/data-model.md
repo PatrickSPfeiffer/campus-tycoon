@@ -170,7 +170,7 @@ PRIMARY KEY (tournament_id, day).
 
 ## Old databases
 
-The structure changed in feature 7, and old databases are not upgraded. Delete the local
+The structure changed in feature 7, and old databases are not upgraded. The one exception: create_tables adds the games.debt column to an older games table (approved by the owner of the data structure). Delete the local
 `data/game.db` and the old Turso tables before running the app; the tables are then
 created fresh.
 

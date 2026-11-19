@@ -21,7 +21,7 @@ the team project and wins where the two differ. Task specs: specs/.
 - Keep it simple: plain functions, so every team member can explain every line.
 - Add a library only when the spec names it. Keep dependencies few, and let uv pin them in uv.lock.
 - Money is a float. Round every money calculation to 2 decimals with round(value, 2).
-- The database tables may change between features. Never write code to upgrade old databases; we reset the data ourselves.
+- The database tables may change between features. Code that upgrades an old database (for example adding a missing column) needs the approval of the owner of the data structure, a test, and a note in docs/data-model.md. Otherwise we reset the data ourselves.
 
 ## Team rules
 - Only the owner of the data structure changes database tables. If a task needs a new table or column, say so and stop.
