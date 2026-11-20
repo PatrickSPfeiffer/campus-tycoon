@@ -764,14 +764,6 @@ def tournament_card(tournament_id, player):
             unsafe_allow_html=True,
         )
 
-        metric_columns = st.columns(3)
-        metric_columns[0].metric("Day", f"Day {screen['day']} of {logic.RUN_DAYS}" if playing else "Complete")
-        if own is None:
-            metric_columns[1].metric("Your role", "Organiser")
-        else:
-            metric_columns[1].metric("Cash", f"€{own['cash']:.2f}")
-        metric_columns[2].metric("Players ready", f"{sum(1 for row in screen['players'] if row['ready'])}/{len(screen['players'])}")
-
         if own is None:
             notice(
                 "info",
@@ -779,141 +771,146 @@ def tournament_card(tournament_id, player):
                 f"To play, join it with the code {screen['code']}.",
             )
         else:
-            section_heading("cart", "Products")
-            product_columns = st.columns(3)
-            # Reference price today for this stand: weather and Coffee machine can raise it.
             references = logic.stand_references(today_weather, owned)
-            for index, product in enumerate(products):
-                reference = references[product]
-                with product_columns[index]:
-                    product_card(
-                        product,
-                        [
-                            ("Stock", own["stock"][product]), ("Price", f"€{own['price'][product]:.2f}"),
-                            ("Reference today", f"€{reference:.2f}"), ("Unit cost", f"€{logic.PRODUCTS[product]['unit_cost']:.2f}"),
-                        ],
-                        f"Budget customers pay up to €{reference:.2f}, premium up to €{2 * reference:.2f}.",
-                        key=f"tournament_product_card_{tournament_id}_{product}",
-                    )
-
-            action_columns = st.columns(2)
-            with action_columns[0]:
-                with st.container(border=True, key=f"action_t{tournament_id}_buy"):
-                    section_heading("cart", "Buy stock")
-                    if can_act:
-                        with st.form(f"t{tournament_id}_buy_form", border=False, clear_on_submit=True):
-                            quantities = {}
-                            for product in products:
-                                quantities[product] = st.number_input(
-                                    f"{product} (€{logic.PRODUCTS[product]['unit_cost']:.2f} each)",
-                                    min_value=0, step=1, value=0, key=f"t{tournament_id}_buy_{product}",
-                                )
-                            buy_submitted = st.form_submit_button("Buy", icon=":material/shopping_cart:", use_container_width=True)
-                        if buy_submitted:
-                            try:
-                                bought = logic.buy_tournament_stock_many(
-                                    DB_PATH, player, tournament_id,
-                                    {product: int(value) for product, value in quantities.items()},
-                                )
-                                flash(f"t{tournament_id}_buy", f"Stock purchased for €{bought['cost']:.2f}.")
-                                st.rerun(scope="fragment")
-                            except (ValueError, db.DatabaseUnavailable) as error:
-                                notice("error", friendly_error(error))
-                        show_flash(f"t{tournament_id}_buy")
-
-            with action_columns[1]:
-                with st.container(border=True, key=f"action_t{tournament_id}_price"):
-                    section_heading("trending-up", "Set prices")
-                    if can_act:
-                        with st.form(f"t{tournament_id}_price_form", border=False):
-                            new_prices = {}
-                            for product in products:
-                                new_prices[product] = st.number_input(
-                                    f"{product} (€)", step=0.01,
-                                    value=float(own["price"][product]), format="%.2f",
-                                    key=f"t{tournament_id}_price_{product}",
-                                )
-                            price_submitted = st.form_submit_button("Set prices", icon=":material/sell:", use_container_width=True)
-                        if price_submitted:
-                            changed = {
-                                product: round(float(value), 2)
-                                for product, value in new_prices.items()
-                                if round(float(value), 2) != own["price"][product]
-                            }
-                            if not changed:
-                                notice("info", "No price changed.")
-                            else:
+            with st.form(f"t{tournament_id}_day_form", border=False, enter_to_submit=False):
+                with st.container(border=True, key=f"tournament_part_money_{tournament_id}"):
+                    part_heading(1, "Your day and money")
+                    cash_column, progress_column, players_column, upgrade_column = st.columns(4)
+                    with cash_column:
+                        with st.container(border=True, key=f"tournament_box_cash_{tournament_id}"):
+                            money_box("Cash", f"€{own['cash']:.2f}", "Tournament cash")
+                    with progress_column:
+                        with st.container(border=True, key=f"tournament_box_progress_{tournament_id}"):
+                            money_box("Progress", f"Day {screen['day']} of {logic.RUN_DAYS}" if playing else "Complete", "Tournament day")
+                    with players_column:
+                        with st.container(border=True, key=f"tournament_box_players_{tournament_id}"):
+                            ready_count = sum(1 for row in screen["players"] if row["ready"])
+                            money_box("Players ready", f"{ready_count}/{len(screen['players'])}", "Ready to close the day")
+                    with upgrade_column:
+                        with st.container(border=True, key=f"tournament_box_upgrade_{tournament_id}"):
+                            machine = next(iter(logic.UPGRADES))
+                            details = logic.UPGRADES[machine]
+                            money_box("Coffee machine", "Owned" if machine in owned else f"€{details['cost']:.2f}", "Raises Café reference price")
+                            if machine in owned:
+                                st.caption("Already purchased")
+                            elif can_act and st.form_submit_button(f"Buy {machine}", icon=":material/upgrade:", use_container_width=True):
                                 try:
-                                    logic.set_tournament_prices(DB_PATH, player, tournament_id, changed)
-                                    flash(f"t{tournament_id}_price", "Prices updated.")
-                                    st.rerun(scope="fragment")
-                                except (ValueError, db.DatabaseUnavailable) as error:
-                                    notice("error", friendly_error(error))
-                        show_flash(f"t{tournament_id}_price")
-
-            for name, details in logic.UPGRADES.items():
-                product_name = html.escape(str(details["product"]))
-                reference_price = html.escape(f"€{float(details['reference_price']):.2f}")
-                with st.container(border=True, key=f"upgrade_tournament_{tournament_id}_{name}"):
-                    upgrade_columns = st.columns([5, 2], vertical_alignment="center")
-                    with upgrade_columns[0]:
-                        st.markdown(
-                            f'<div class="tournament-upgrade-content">{icon("trending-up", 20)}'
-                            f'<span class="tournament-upgrade-name">{html.escape(str(name))}</span>'
-                            f'<span class="tournament-upgrade-description">Raises the {product_name} reference price to {reference_price}</span></div>',
-                            unsafe_allow_html=True,
-                        )
-                    with upgrade_columns[1]:
-                        if name in owned:
-                            st.markdown(
-                                f'<div class="tournament-upgrade-owned"><span class="tournament-owned">{icon("check", 16)} Owned</span></div>',
-                                unsafe_allow_html=True,
-                            )
-                        elif can_act:
-                            if st.button(
-                                f"Buy {name} (€{details['cost']:.2f})", icon=":material/upgrade:",
-                                key=f"t{tournament_id}_upgrade_{name}_button", use_container_width=True,
-                            ):
-                                try:
-                                    logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, name)
+                                    logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, machine)
                                     flash(f"t{tournament_id}_upgrade", "Upgrade purchased.")
                                     st.rerun(scope="fragment")
                                 except (ValueError, db.DatabaseUnavailable) as error:
                                     notice("error", friendly_error(error))
-                    show_flash(f"t{tournament_id}_upgrade")
 
-            if can_act:
-                # Hints only: Ready stays allowed (specs/feature-easier-screens.md).
-                for warning in logic.trade_warnings(own["stock"], own["price"], references):
-                    notice("warning", warning)
-                if st.button("Ready", key=f"t{tournament_id}_ready_button", icon=":material/check:", type="primary", use_container_width=True):
-                    try:
-                        result = logic.ready_tournament(DB_PATH, player, tournament_id)
-                        if result["closed_day"]:
-                            # Everyone is ready, so this click closed the day: show its result.
-                            flash(f"t{tournament_id}_ready", result["closed_day"], kind="closed_day")
+                with st.container(border=True, key=f"tournament_part_plan_{tournament_id}"):
+                    part_heading(2, f"Plan day {screen['day']}")
+                    st.caption("Sales depend on every stand's prices; tournament sales are calculated when the day closes.")
+                    with st.container(key=f"tournament_plan_headings_{tournament_id}"):
+                        buy_heading, _, sell_heading = st.columns(PLAN_SIDES)
+                        buy_heading.markdown('<div class="plan-heading plan-heading-buy">Buy from the supplier</div>', unsafe_allow_html=True)
+                        sell_heading.markdown('<div class="plan-heading plan-heading-sell">Sell to customers</div>', unsafe_allow_html=True)
+                    quantities, new_prices = {}, {}
+                    for name, details in logic.PRODUCTS.items():
+                        with st.container(key=f"tournament_line_{tournament_id}_{name}"):
+                            buy_side, arrow, sell_side = st.columns(PLAN_SIDES, vertical_alignment="center")
+                            with buy_side:
+                                with st.container(border=True, key=f"tournament_buy_side_{tournament_id}_{name}"):
+                                    name_column, cost_column, quantity_column = st.columns([1.3, 1, 1], vertical_alignment="top")
+                                    name_column.markdown(
+                                        f'<div class="plan-product">{icon(PRODUCT_ICONS.get(name, "box"))}<div><div class="plan-product-name">{html.escape(name)}</div><div class="plan-product-stock">{own["stock"][name]} in stock</div></div></div>',
+                                        unsafe_allow_html=True,
+                                    )
+                                    with cost_column:
+                                        plan_label("Supplier price")
+                                        plan_value(f"€{details['unit_cost']:.2f}")
+                                    with quantity_column:
+                                        plan_label("How many")
+                                        quantities[name] = st.number_input(f"How many tournament {name}", min_value=0, step=1, value=0, key=f"t{tournament_id}_buy_{name}", disabled=not can_act, label_visibility="collapsed")
+                            arrow.markdown('<div class="plan-arrow">→</div>', unsafe_allow_html=True)
+                            with sell_side:
+                                with st.container(border=True, key=f"tournament_sell_side_{tournament_id}_{name}"):
+                                    reference_column, price_column, market_column = st.columns(3, vertical_alignment="top")
+                                    with reference_column:
+                                        plan_label("Reference price")
+                                        plan_value(f"€{references[name]:.2f}", plain=True)
+                                    with price_column:
+                                        plan_label("Your selling price (€)")
+                                        new_prices[name] = st.number_input(f"Tournament selling price for {name} (€)", step=0.01, value=own["price"][name], format="%.2f", key=f"t{tournament_id}_price_{name}", disabled=not can_act, label_visibility="collapsed")
+                                    with market_column:
+                                        plan_label("Market result")
+                                        plan_value("At close", plain=True)
+                    buy_button_column, _, save_button_column = st.columns(PLAN_SIDES)
+                    with buy_button_column:
+                        buy_submitted = st.form_submit_button("Buy stock", key=f"t{tournament_id}_buy_button", icon=":material/shopping_cart:", disabled=not can_act, use_container_width=True)
+                    with save_button_column:
+                        prices_submitted = st.form_submit_button("Save selling prices", key=f"t{tournament_id}_save_prices_button", icon=":material/sell:", disabled=not can_act, use_container_width=True)
+                    if buy_submitted:
+                        try:
+                            bought = logic.buy_tournament_stock_many(DB_PATH, player, tournament_id, {product: int(value) for product, value in quantities.items()})
+                            flash(f"t{tournament_id}_buy", f"Stock purchased for €{bought['cost']:.2f}.", kind="toast")
+                            st.rerun(scope="fragment")
+                        except (ValueError, db.DatabaseUnavailable) as error:
+                            notice("error", friendly_error(error))
+                    if prices_submitted:
+                        changed = {product: round(float(value), 2) for product, value in new_prices.items() if round(float(value), 2) != own["price"][product]}
+                        if not changed:
+                            notice("info", "No price changed.")
                         else:
-                            flash(f"t{tournament_id}_ready", "You are Ready.")
-                        st.rerun(scope="fragment")
-                    except (ValueError, db.DatabaseUnavailable) as error:
-                        notice("error", friendly_error(error))
-            elif is_ready and playing:
-                notice("info", "You are Ready. Waiting for the other players.")
+                            try:
+                                logic.set_tournament_prices(DB_PATH, player, tournament_id, changed)
+                                flash(f"t{tournament_id}_price", "Prices updated.", kind="toast")
+                                st.rerun(scope="fragment")
+                            except (ValueError, db.DatabaseUnavailable) as error:
+                                notice("error", friendly_error(error))
+
+                with st.container(border=True, key=f"tournament_part_trade_{tournament_id}"):
+                    part_heading(3, f"Trade day {screen['day']}")
+                    st.caption("Ready submits your prices. The shared market determines sales when the day closes.")
+                    if can_act:
+                        for warning in logic.trade_warnings(own["stock"], own["price"], references):
+                            notice("warning", warning)
+                        ready_submitted = st.form_submit_button("Ready", key=f"t{tournament_id}_ready_button", icon=":material/check:", type="primary", use_container_width=True)
+                    else:
+                        ready_submitted = False
+                    if ready_submitted:
+                        try:
+                            result = logic.ready_tournament(DB_PATH, player, tournament_id)
+                            if result["closed_day"]:
+                                flash(f"t{tournament_id}_ready", result["closed_day"], kind="closed_day")
+                            else:
+                                flash(f"t{tournament_id}_ready", "You are Ready.")
+                            st.rerun(scope="fragment")
+                        except (ValueError, db.DatabaseUnavailable) as error:
+                            notice("error", friendly_error(error))
+                    elif is_ready and playing:
+                        notice("info", "You are Ready. Waiting for the other players.")
+                    if player == screen["organiser"] and playing:
+                        close_submitted = st.form_submit_button("Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:", use_container_width=True)
+                        if close_submitted:
+                            try:
+                                closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
+                                flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
+                                st.rerun(scope="fragment")
+                            except (ValueError, db.DatabaseUnavailable) as error:
+                                notice("error", friendly_error(error))
+        section_heading("trending-up", "Results")
+        if not screen["days"]:
+            notice("info", "Trade a day to see your results.")
         show_flash(f"t{tournament_id}_ready")
-        if player == screen["organiser"] and playing and st.button(
-            "Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:",
-            use_container_width=True,
-        ):
-            try:
-                closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
-                flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
-                st.rerun(scope="fragment")
-            except (ValueError, db.DatabaseUnavailable) as error:
-                notice("error", friendly_error(error))
         show_flash(f"t{tournament_id}_close")
 
+        if screen["days"]:
+            section_heading("trending-up", "Market results")
+            latest = screen["days"][-1]
+            st.caption(f"Day {latest['day']}: every stand's price and units sold.")
+            st.table(market_rows(latest, player))
+            if len(screen["days"]) > 1:
+                with st.expander("Earlier days"):
+                    for day in reversed(screen["days"][:-1]):
+                        st.write(f"Day {day['day']}")
+                        st.table(market_rows(day, player))
+
         if screen["ranking"] is not None:
-            section_heading("trophy", "Ranking")
+            st.subheader("Ranking")
             for position, row in enumerate(screen["ranking"], start=1):
                 position_label = {1: "1st", 2: "2nd", 3: "3rd"}.get(position, str(position))
                 tone = {1: "#F5A524", 2: "#C0C8D0", 3: "#CD7F32"}.get(position, "rgba(255,255,255,.12)")
@@ -927,6 +924,7 @@ def tournament_card(tournament_id, player):
                     f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Stock at cost<br><b style="color:var(--text)">€{row["stock_at_cost"]:.2f}</b></span></div>',
                     unsafe_allow_html=True,
                 )
+
         section_heading("users", "Players")
         for row in screen["players"]:
             ready_label = "Ready" if row["ready"] else "Not ready"
@@ -937,17 +935,6 @@ def tournament_card(tournament_id, player):
                 f'<span style="padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.07);color:{ready_color};font-size:.8rem;font-weight:700">{ready_label}</span></div>',
                 unsafe_allow_html=True,
             )
-
-        if screen["days"]:
-            section_heading("trending-up", "Market results")
-            latest = screen["days"][-1]
-            st.caption(f"Day {latest['day']}: every stand's price and units sold.")
-            st.table(market_rows(latest, player))
-            if len(screen["days"]) > 1:
-                with st.expander("Earlier days"):
-                    for day in reversed(screen["days"][:-1]):
-                        st.write(f"Day {day['day']}")
-                        st.table(market_rows(day, player))
 
 
 def tournaments_screen():
