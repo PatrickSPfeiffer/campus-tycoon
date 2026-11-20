@@ -210,14 +210,42 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 .trade-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:.2rem 0 .6rem; }
 .st-key-practice_trade_day_button button { min-height:3.75rem; box-shadow:0 0 26px rgba(255,122,24,.45); }
 .st-key-practice_trade_day_button button p { font-size:1.3rem !important; font-weight:800 !important; }
+[class*="st-key-tournament_part_"] { box-sizing:border-box; padding:20px 22px 22px !important; height:auto !important; overflow:visible !important; margin-bottom:.4rem; }
+[class*="st-key-tournament_part_"]:hover { transform:none !important; }
+[class*="st-key-tournament_part_money_"] [data-testid="stHorizontalBlock"] { align-items:stretch !important; }
+[class*="st-key-tournament_part_money_"] [data-testid="stColumn"] > [data-testid="stVerticalBlock"], [class*="st-key-tournament_part_money_"] [data-testid="stColumn"] > div { height:100%; }
+[class*="st-key-tournament_box_"] { box-sizing:border-box; height:100% !important; min-height:12.5rem; padding:16px !important; }
+[class*="st-key-tournament_plan_headings_"] :is([data-testid="stElementContainer"], [data-testid="stMarkdown"], [data-testid="stMarkdownContainer"]) { margin:0 !important; }
+[class*="st-key-tournament_plan_headings_"] [data-testid="stMarkdownContainer"] :is(p, div) { margin:0 !important; }
+:is([class*="st-key-tournament_buy_side_"], [class*="st-key-tournament_sell_side_"]) { box-sizing:border-box; height:calc(4.3rem + 22px) !important; padding:10px 12px !important; border-radius:14px !important; overflow:hidden; }
+[class*="st-key-tournament_buy_side_"] { background:rgba(94,234,212,.06) !important; border:1px solid rgba(94,234,212,.25) !important; }
+[class*="st-key-tournament_sell_side_"] { background:rgba(245,165,36,.06) !important; border:1px solid rgba(245,165,36,.25) !important; }
+:is([class*="st-key-tournament_buy_side_"], [class*="st-key-tournament_sell_side_"]) :is([data-testid="stElementContainer"], [data-testid="stMarkdown"], [data-testid="stMarkdownContainer"], [data-testid="stNumberInput"]) { margin:0 !important; }
+:is([class*="st-key-tournament_buy_side_"], [class*="st-key-tournament_sell_side_"]) [data-testid="stMarkdownContainer"] :is(p, div) { margin:0 !important; }
+:is([class*="st-key-tournament_buy_side_"], [class*="st-key-tournament_sell_side_"]) [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { gap:.4rem !important; }
+:is([class*="st-key-tournament_buy_side_"], [class*="st-key-tournament_sell_side_"]) [data-testid="stNumberInput"] [data-testid="stWidgetLabel"] { display:none !important; }
+:is([class*="st-key-tournament_buy_side_"], [class*="st-key-tournament_sell_side_"]) :is([data-testid="stNumberInput"], [data-testid="stNumberInputContainer"]) { height:2.5rem !important; min-height:2.5rem; }
+:is([class*="st-key-tournament_buy_side_"], [class*="st-key-tournament_sell_side_"]) [data-testid="stElementContainer"]:has(.plan-label) { height:1.4rem; }
+[class*="st-key-tournament_buy_side_"] .plan-text { color:var(--teal); }
+[class*="st-key-tournament_sell_side_"] .plan-text { color:var(--amber); }
+[class*="st-key-tournament_sell_side_"] .plan-text-plain { color:var(--text); }
+[class*="st-key-t"][class*="_buy_button"] button { border-color:rgba(94,234,212,.6) !important; }
+[class*="st-key-t"][class*="_buy_button"] button:hover { background:rgba(94,234,212,.16) !important; border-color:var(--teal) !important; box-shadow:0 0 18px rgba(94,234,212,.22) !important; }
+[class*="st-key-t"][class*="_buy_button"] button span, [class*="st-key-t"][class*="_buy_button"] button svg { color:var(--teal) !important; fill:var(--teal) !important; }
+[class*="st-key-tournament_part_trade_"] { border:2px solid var(--orange) !important; box-shadow:0 0 0 4px rgba(255,122,24,.12),0 0 40px rgba(255,122,24,.40),0 12px 32px rgba(0,0,0,.30) !important; }
+[class*="st-key-tournament_part_trade_"]:hover { border-color:var(--orange) !important; }
+[class*="st-key-tournament_part_trade_"] .part-heading { color:var(--orange); }
+[class*="st-key-t"][class*="_ready_button"] button { min-height:3.75rem; box-shadow:0 0 26px rgba(255,122,24,.45); }
+[class*="st-key-t"][class*="_ready_button"] button p { font-size:1.3rem !important; font-weight:800 !important; }
+.part-caption { color:var(--muted); font-size:.9rem; margin:0 0 .6rem; }
 @media (max-width:640px) {
   .trade-stats { grid-template-columns:1fr; }
-  .st-key-practice_plan_headings, .plan-arrow { display:none; }
-  [class*="st-key-practice_box_"] { min-height:0; }
-  :is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"]) { height:auto !important; overflow:visible; }
+  .st-key-practice_plan_headings, [class*="st-key-tournament_plan_headings_"], .plan-arrow { display:none; }
+  [class*="st-key-practice_box_"], [class*="st-key-tournament_box_"] { min-height:0; }
+  :is([class*="st-key-practice_buy_side_"], [class*="st-key-practice_sell_side_"], [class*="st-key-tournament_buy_side_"], [class*="st-key-tournament_sell_side_"]) { height:auto !important; overflow:visible; }
   .plan-product { height:auto; }
-  [class*="st-key-practice_buy_side_"]::before { content:"Buy from the supplier"; color:var(--teal); font-weight:800; }
-  [class*="st-key-practice_sell_side_"]::before { content:"Sell to customers"; color:var(--amber); font-weight:800; }
+  :is([class*="st-key-practice_buy_side_"], [class*="st-key-tournament_buy_side_"])::before { content:"Buy from the supplier"; color:var(--teal); font-weight:800; }
+  :is([class*="st-key-practice_sell_side_"], [class*="st-key-tournament_sell_side_"])::before { content:"Sell to customers"; color:var(--amber); font-weight:800; }
 }
 .hero-compact { padding:14px 24px; text-align:left; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; }
 .hero-compact h1 { font-size:1.9rem; }
@@ -703,6 +731,18 @@ def show_closed_day(closed_day, player, scope):
             )
 
 
+def show_players(screen):
+    for row in screen["players"]:
+        ready_label = "Ready" if row["ready"] else "Not ready"
+        ready_color = "var(--good)" if row["ready"] else "var(--muted)"
+        st.markdown(
+            f'<div class="tournament-player-row">'
+            f'<span>{html.escape(str(logic.player_name(row["player"])))}</span>'
+            f'<span style="padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.07);color:{ready_color};font-size:.8rem;font-weight:700">{ready_label}</span></div>',
+            unsafe_allow_html=True,
+        )
+
+
 def market_rows(day, player):
     # One row per stand: price and units sold of each product (no cash or stock of others).
     rows = []
@@ -764,6 +804,10 @@ def tournament_card(tournament_id, player):
             unsafe_allow_html=True,
         )
 
+        show_flash(f"t{tournament_id}_buy")
+        show_flash(f"t{tournament_id}_price")
+        show_flash(f"t{tournament_id}_upgrade")
+
         if own is None:
             notice(
                 "info",
@@ -791,9 +835,7 @@ def tournament_card(tournament_id, player):
                             machine = next(iter(logic.UPGRADES))
                             details = logic.UPGRADES[machine]
                             money_box("Coffee machine", "Owned" if machine in owned else f"€{details['cost']:.2f}", "Raises Café reference price")
-                            if machine in owned:
-                                st.caption("Already purchased")
-                            elif can_act and st.form_submit_button(f"Buy {machine}", icon=":material/upgrade:", use_container_width=True):
+                            if machine not in owned and can_act and st.form_submit_button(f"Buy {machine}", icon=":material/upgrade:", use_container_width=True):
                                 try:
                                     logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, machine)
                                     flash(f"t{tournament_id}_upgrade", "Upgrade purchased.")
@@ -803,7 +845,12 @@ def tournament_card(tournament_id, player):
 
                 with st.container(border=True, key=f"tournament_part_plan_{tournament_id}"):
                     part_heading(2, f"Plan day {screen['day']}")
-                    st.caption("Sales depend on every stand's prices; tournament sales are calculated when the day closes.")
+                    st.markdown(
+                        f'<div class="plan-rule"><span class="plan-rule-icon">{icon("info", 16)}</span>Customers per day: '
+                        "<b>10</b> per player and product · half pay up to the reference price, half up to twice it · "
+                        "the cheapest stand sells first.</div>",
+                        unsafe_allow_html=True,
+                    )
                     with st.container(key=f"tournament_plan_headings_{tournament_id}"):
                         buy_heading, _, sell_heading = st.columns(PLAN_SIDES)
                         buy_heading.markdown('<div class="plan-heading plan-heading-buy">Buy from the supplier</div>', unsafe_allow_html=True)
@@ -836,8 +883,9 @@ def tournament_card(tournament_id, player):
                                         plan_label("Your selling price (€)")
                                         new_prices[name] = st.number_input(f"Tournament selling price for {name} (€)", step=0.01, value=own["price"][name], format="%.2f", key=f"t{tournament_id}_price_{name}", disabled=not can_act, label_visibility="collapsed")
                                     with market_column:
-                                        plan_label("Market result")
-                                        plan_value("At close", plain=True)
+                                        # The rule for this stand today (budget / premium), not a sales estimate.
+                                        plan_label("Customers pay up to")
+                                        plan_value(f"€{references[name]:.2f} / €{2 * references[name]:.2f}", plain=True)
                     buy_button_column, _, save_button_column = st.columns(PLAN_SIDES)
                     with buy_button_column:
                         buy_submitted = st.form_submit_button("Buy stock", key=f"t{tournament_id}_buy_button", icon=":material/shopping_cart:", disabled=not can_act, use_container_width=True)
@@ -864,7 +912,7 @@ def tournament_card(tournament_id, player):
 
                 with st.container(border=True, key=f"tournament_part_trade_{tournament_id}"):
                     part_heading(3, f"Trade day {screen['day']}")
-                    st.caption("Ready submits your prices. The shared market determines sales when the day closes.")
+                    st.markdown('<div class="part-caption">Press Ready when your stock and prices are set. The day closes when every player is Ready (or the organiser closes it), then the shared market decides the sales.</div>', unsafe_allow_html=True)
                     if can_act:
                         for warning in logic.trade_warnings(own["stock"], own["price"], references):
                             notice("warning", warning)
@@ -883,6 +931,7 @@ def tournament_card(tournament_id, player):
                             notice("error", friendly_error(error))
                     elif is_ready and playing:
                         notice("info", "You are Ready. Waiting for the other players.")
+                    show_players(screen)
                     if player == screen["organiser"] and playing:
                         close_submitted = st.form_submit_button("Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:", use_container_width=True)
                         if close_submitted:
@@ -892,49 +941,52 @@ def tournament_card(tournament_id, player):
                                 st.rerun(scope="fragment")
                             except (ValueError, db.DatabaseUnavailable) as error:
                                 notice("error", friendly_error(error))
-        section_heading("trending-up", "Results")
-        if not screen["days"]:
-            notice("info", "Trade a day to see your results.")
-        show_flash(f"t{tournament_id}_ready")
-        show_flash(f"t{tournament_id}_close")
+        if own is None:
+            # 3. The organiser who does not play: who is ready, and Close day now.
+            with st.container(border=True, key=f"tournament_part_trade_{tournament_id}"):
+                part_heading(3, f"Day {screen['day']}" if playing else "Tournament complete")
+                st.markdown('<div class="part-caption">The day closes when every player is Ready, or when you close it now.</div>', unsafe_allow_html=True)
+                show_players(screen)
+                if playing and st.button("Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:", use_container_width=True):
+                    try:
+                        closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
+                        flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
+                        st.rerun(scope="fragment")
+                    except (ValueError, db.DatabaseUnavailable) as error:
+                        notice("error", friendly_error(error))
 
-        if screen["days"]:
-            section_heading("trending-up", "Market results")
-            latest = screen["days"][-1]
-            st.caption(f"Day {latest['day']}: every stand's price and units sold.")
-            st.table(market_rows(latest, player))
-            if len(screen["days"]) > 1:
-                with st.expander("Earlier days"):
-                    for day in reversed(screen["days"][:-1]):
-                        st.write(f"Day {day['day']}")
-                        st.table(market_rows(day, player))
+        # 4. Results: the day just closed, every stand's prices and sales, and the ranking at the end.
+        with st.container(border=True, key=f"tournament_part_results_{tournament_id}"):
+            part_heading(4, "Results")
+            show_flash(f"t{tournament_id}_ready")
+            show_flash(f"t{tournament_id}_close")
+            if not screen["days"]:
+                notice("info", "Results appear here when the first day closes.")
+            else:
+                latest = screen["days"][-1]
+                st.markdown(f'<div class="part-caption">Day {latest["day"]}: every stand\'s price and units sold.</div>', unsafe_allow_html=True)
+                st.table(market_rows(latest, player))
+                if len(screen["days"]) > 1:
+                    with st.expander("Earlier days"):
+                        for day in reversed(screen["days"][:-1]):
+                            st.write(f"Day {day['day']}")
+                            st.table(market_rows(day, player))
 
-        if screen["ranking"] is not None:
-            st.subheader("Ranking")
-            for position, row in enumerate(screen["ranking"], start=1):
-                position_label = {1: "1st", 2: "2nd", 3: "3rd"}.get(position, str(position))
-                tone = {1: "#F5A524", 2: "#C0C8D0", 3: "#CD7F32"}.get(position, "rgba(255,255,255,.12)")
-                st.markdown(
-                    f'<div class="tournament-ranking-row">'
-                    f'<span style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;'
-                    f'border-radius:50%;background:{tone};color:#2B1608;font-weight:800">{position_label}</span>'
-                    f'<strong style="flex:1">{html.escape(str(logic.player_name(row["player"])))}</strong>'
-                    f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Gain<br><b style="color:var(--text)">€{row["gain"]:.2f}</b></span>'
-                    f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Final cash<br><b style="color:var(--text)">€{row["final_cash"]:.2f}</b></span>'
-                    f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Stock at cost<br><b style="color:var(--text)">€{row["stock_at_cost"]:.2f}</b></span></div>',
-                    unsafe_allow_html=True,
-                )
-
-        section_heading("users", "Players")
-        for row in screen["players"]:
-            ready_label = "Ready" if row["ready"] else "Not ready"
-            ready_color = "var(--good)" if row["ready"] else "var(--muted)"
-            st.markdown(
-                f'<div class="tournament-player-row">'
-                f'<span>{html.escape(str(logic.player_name(row["player"])))}</span>'
-                f'<span style="padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.07);color:{ready_color};font-size:.8rem;font-weight:700">{ready_label}</span></div>',
-                unsafe_allow_html=True,
-            )
+            if screen["ranking"] is not None:
+                st.markdown('<div class="section-heading">Ranking</div>', unsafe_allow_html=True)
+                for position, row in enumerate(screen["ranking"], start=1):
+                    position_label = {1: "1st", 2: "2nd", 3: "3rd"}.get(position, str(position))
+                    tone = {1: "#F5A524", 2: "#C0C8D0", 3: "#CD7F32"}.get(position, "rgba(255,255,255,.12)")
+                    st.markdown(
+                        f'<div class="tournament-ranking-row">'
+                        f'<span style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;'
+                        f'border-radius:50%;background:{tone};color:#2B1608;font-weight:800">{position_label}</span>'
+                        f'<strong style="flex:1">{html.escape(str(logic.player_name(row["player"])))}</strong>'
+                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Gain<br><b style="color:var(--text)">€{row["gain"]:.2f}</b></span>'
+                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Final cash<br><b style="color:var(--text)">€{row["final_cash"]:.2f}</b></span>'
+                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Stock at cost<br><b style="color:var(--text)">€{row["stock_at_cost"]:.2f}</b></span></div>',
+                        unsafe_allow_html=True,
+                    )
 
 
 def tournaments_screen():
