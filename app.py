@@ -4,7 +4,6 @@ import db
 import html
 import logic
 import mailer
-import weather
 
 DB_PATH = db.DEFAULT_PATH
 
@@ -238,6 +237,7 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 [class*="st-key-t"][class*="_ready_button"] button { min-height:3.75rem; box-shadow:0 0 26px rgba(255,122,24,.45); }
 [class*="st-key-t"][class*="_ready_button"] button p { font-size:1.3rem !important; font-weight:800 !important; }
 .part-caption { color:var(--muted); font-size:.9rem; margin:0 0 .6rem; }
+.result-product { display:flex; align-items:center; gap:6px; color:var(--amber); font-weight:800; margin:.4rem 0 .2rem; }
 @media (max-width:640px) {
   .trade-stats { grid-template-columns:1fr; }
   .st-key-practice_plan_headings, [class*="st-key-tournament_plan_headings_"], .plan-arrow { display:none; }
@@ -715,20 +715,14 @@ def practice_screen():
 
 
 def show_closed_day(closed_day, player, scope):
-    with st.container(border=True, key=f"{scope}_closed_day"):
-        notice("success", f"Day {closed_day['day']} closed.")
-        own_sales = closed_day.get("by_player", {}).get(player)
-        if own_sales is not None:
-            st.table(
-                [
-                    {
-                        "Product": product,
-                        "Units sold": line["units_sold"],
-                        "Revenue": f"€{line['revenue']:.2f}",
-                    }
-                    for product, line in own_sales.items()
-                ]
-            )
+    # The full results are shown in the card; here only a short line with the player's own sales.
+    own_sales = closed_day.get("by_player", {}).get(player)
+    message = f"Day {closed_day['day']} closed."
+    if own_sales is not None:
+        units = sum(line["units_sold"] for line in own_sales.values())
+        revenue = round(sum(line["revenue"] for line in own_sales.values()), 2)
+        message += f" You sold {units} units for €{revenue:.2f}."
+    notice("success", message)
 
 
 def show_players(screen):
@@ -743,23 +737,79 @@ def show_players(screen):
         )
 
 
-def market_rows(day, player):
-    # One row per stand: price and units sold of each product (no cash or stock of others).
-    rows = []
-    for stand in day["stands"]:
-        row = {"Player": stand["name"] + (" (you)" if stand["player"] == player else "")}
-        for product in logic.PRODUCTS:
-            row[f"{product} price"] = f"€{stand['price'][product]:.2f}"
-            row[f"{product} sold"] = stand["units_sold"][product]
-        rows.append(row)
-    return rows
+def show_day_tables(day, player):
+    # One small table per product: every stand's price and units sold (no cash or stock of others).
+    columns = st.columns(len(logic.PRODUCTS))
+    for column, product in zip(columns, logic.PRODUCTS):
+        with column:
+            st.markdown(
+                f'<div class="result-product">{icon(PRODUCT_ICONS.get(product, "box"), 18)} {html.escape(product)}</div>',
+                unsafe_allow_html=True,
+            )
+            st.table([
+                {
+                    "Player": stand["name"] + (" (you)" if stand["player"] == player else ""),
+                    "Price": f"€{stand['price'][product]:.2f}",
+                    "Sold": stand["units_sold"][product],
+                }
+                for stand in day["stands"]
+            ])
+
+
+def show_tournament_charts(screen, player):
+    # Like the Practice charts, from the saved tournament results.
+    days = screen["days"]
+    labels = [f"Day {day['day']}" for day in days]
+    own = logic.tournament_chart_data(days, player)
+    own["Day"] = labels
+    everyone = logic.tournament_players_chart_data(days)
+    everyone["Day"] = labels
+    # Chart field names cannot contain dots (they mean "inside" for the chart library).
+    everyone = {key.replace(".", " "): values for key, values in everyone.items()}
+    player_names = [key for key in everyone if key != "Day"]
+    chart_left, chart_right = st.columns(2)
+    if own["Day"] and screen["stand"] is not None:
+        with chart_left:
+            with st.container(border=True):
+                st.write("Your gross profit per day by product")
+                st.bar_chart(
+                    own, x="Day", y=list(logic.PRODUCTS), stack=False,
+                    color=["#F5A524", "#FF7A18", "#5EEAD4"], x_label="Day", y_label="Gross profit (€)",
+                )
+    with chart_right if screen["stand"] is not None else chart_left:
+        with st.container(border=True):
+            st.write("Gross profit per day: every player")
+            st.bar_chart(everyone, x="Day", y=player_names, stack=False, x_label="Day", y_label="Gross profit (€)")
+
+
+def show_results(screen, player, charts_open):
+    # The last closed day first; older days and the charts below (open at the end of the tournament).
+    days = screen["days"]
+    if not days:
+        notice("info", "Results appear here when the first day closes.")
+        return
+    latest = days[-1]
+    st.markdown(f'<div class="part-caption">Day {latest["day"]}: every stand\'s price and units sold.</div>', unsafe_allow_html=True)
+    show_day_tables(latest, player)
+    if charts_open:
+        show_tournament_charts(screen, player)
+        for day in reversed(days[:-1]):
+            with st.expander(f"Day {day['day']}"):
+                show_day_tables(day, player)
+    else:
+        with st.expander("Charts and all days"):
+            show_tournament_charts(screen, player)
+            for day in reversed(days[:-1]):
+                st.markdown(f'<div class="result-product">Day {day["day"]}</div>', unsafe_allow_html=True)
+                show_day_tables(day, player)
 
 
 # Each tournament card is a fragment: its buttons rerun only this card.
 @st.fragment
 def tournament_card(tournament_id, player):
     try:
-        screen = logic.tournament_screen(DB_PATH, player, tournament_id, weather.fetch_lisbon_weather)
+        # Simulated weather per tournament day (specs/feature-tournament-clarity.md).
+        screen = logic.tournament_screen(DB_PATH, player, tournament_id)
     except (ValueError, db.DatabaseUnavailable) as error:
         notice("error", friendly_error(error))
         return
@@ -796,25 +846,48 @@ def tournament_card(tournament_id, player):
             "normal": ("rgba(255,236,210,0.18)", "rgba(245,165,36,0.12)"),
         }
         tint_start, tint_end = weather_tints[weather_name]
-        st.markdown(
-            f'<div style="display:flex;align-items:center;gap:20px;padding:18px 22px;margin:12px 0;'
-            f'background:linear-gradient(120deg,{tint_start},{tint_end});border:1px solid rgba(255,255,255,.18);'
-            f'border-radius:20px;backdrop-filter:blur(18px)">{icon(weather_icon, 48)}'
-            f'<div style="font-size:1.35rem;font-weight:800">Today in Lisbon: {html.escape(weather_label)}</div></div>',
-            unsafe_allow_html=True,
-        )
+        effect = {
+            "rain": "Café reference €5.00 today",
+            "hot": "Water reference €1.50 today",
+            "normal": "no change to the reference prices",
+        }[weather_name]
+        if own is not None and playing:
+            st.markdown(
+                f'<div style="display:flex;align-items:center;gap:20px;padding:18px 22px;margin:12px 0;'
+                f'background:linear-gradient(120deg,{tint_start},{tint_end});border:1px solid rgba(255,255,255,.18);'
+                f'border-radius:20px;backdrop-filter:blur(18px)">{icon(weather_icon, 48)}'
+                f'<div><div style="font-size:1.35rem;font-weight:800">Day {screen["day"]} weather: {html.escape(weather_label)}</div>'
+                f'<div style="color:var(--muted)">{html.escape(effect)}</div></div></div>',
+                unsafe_allow_html=True,
+            )
 
         show_flash(f"t{tournament_id}_buy")
         show_flash(f"t{tournament_id}_price")
         show_flash(f"t{tournament_id}_upgrade")
+        show_flash(f"t{tournament_id}_ready")
+        show_flash(f"t{tournament_id}_close")
+        show_flash(f"t{tournament_id}_join")
 
         if own is None:
-            notice(
-                "info",
-                "You organise this tournament but do not play in it. "
-                f"To play, join it with the code {screen['code']}.",
+            # An organiser who has not joined: no weather and no parts 1-3, only a way to join.
+            st.markdown(
+                f'<div class="part-caption">You created this tournament. Share the code '
+                f'<b>{html.escape(screen["code"])}</b> with the players, or join it yourself to play.</div>',
+                unsafe_allow_html=True,
             )
-        else:
+            if playing and st.button("Join this tournament", key=f"t{tournament_id}_join_button", icon=":material/login:", type="primary"):
+                try:
+                    joined = logic.join_tournament(DB_PATH, player, screen["code"])
+                    flash(f"t{tournament_id}_join", f"You joined {joined['name']} in seat {joined['seat']}.")
+                    st.rerun(scope="fragment")
+                except (ValueError, db.DatabaseUnavailable) as error:
+                    notice("error", friendly_error(error))
+        elif playing:
+            if screen["days"]:
+                # Results first: what happened on the last closed day.
+                with st.container(border=True, key=f"tournament_part_latest_{tournament_id}"):
+                    st.markdown(f'<div class="part-heading">Day {screen["days"][-1]["day"]} results</div>', unsafe_allow_html=True)
+                    show_results(screen, player, charts_open=False)
             references = logic.stand_references(today_weather, owned)
             with st.form(f"t{tournament_id}_day_form", border=False, enter_to_submit=False):
                 with st.container(border=True, key=f"tournament_part_money_{tournament_id}"):
@@ -834,7 +907,11 @@ def tournament_card(tournament_id, player):
                         with st.container(border=True, key=f"tournament_box_upgrade_{tournament_id}"):
                             machine = next(iter(logic.UPGRADES))
                             details = logic.UPGRADES[machine]
-                            money_box("Coffee machine", "Owned" if machine in owned else f"€{details['cost']:.2f}", "Raises Café reference price")
+                            money_box(
+                                "Coffee machine", "Owned" if machine in owned else f"€{details['cost']:.2f}",
+                                f"One time: your Café reference becomes €{details['reference_price']:.2f} for the rest of the "
+                                f"tournament (customers pay up to €{details['reference_price']:.2f} / €{2 * details['reference_price']:.2f}).",
+                            )
                             if machine not in owned and can_act and st.form_submit_button(f"Buy {machine}", icon=":material/upgrade:", use_container_width=True):
                                 try:
                                     logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, machine)
@@ -875,17 +952,21 @@ def tournament_card(tournament_id, player):
                             arrow.markdown('<div class="plan-arrow">→</div>', unsafe_allow_html=True)
                             with sell_side:
                                 with st.container(border=True, key=f"tournament_sell_side_{tournament_id}_{name}"):
-                                    reference_column, price_column, market_column = st.columns(3, vertical_alignment="top")
+                                    reference_column, price_column = st.columns(2, vertical_alignment="top")
+                                    reference = references[name]
                                     with reference_column:
                                         plan_label("Reference price")
-                                        plan_value(f"€{references[name]:.2f}", plain=True)
+                                        plan_value(f"€{reference:.2f}", plain=True)
                                     with price_column:
-                                        plan_label("Your selling price (€)")
+                                        plan_label(
+                                            "Your selling price (€)",
+                                            help=(
+                                                f"Half of the customers pay up to €{reference:.2f}, the other half up to "
+                                                f"€{2 * reference:.2f}. Above €{2 * reference:.2f} nobody buys. "
+                                                "The cheapest stand sells first."
+                                            ),
+                                        )
                                         new_prices[name] = st.number_input(f"Tournament selling price for {name} (€)", step=0.01, value=own["price"][name], format="%.2f", key=f"t{tournament_id}_price_{name}", disabled=not can_act, label_visibility="collapsed")
-                                    with market_column:
-                                        # The rule for this stand today (budget / premium), not a sales estimate.
-                                        plan_label("Customers pay up to")
-                                        plan_value(f"€{references[name]:.2f} / €{2 * references[name]:.2f}", plain=True)
                     buy_button_column, _, save_button_column = st.columns(PLAN_SIDES)
                     with buy_button_column:
                         buy_submitted = st.form_submit_button("Buy stock", key=f"t{tournament_id}_buy_button", icon=":material/shopping_cart:", disabled=not can_act, use_container_width=True)
@@ -955,38 +1036,31 @@ def tournament_card(tournament_id, player):
                     except (ValueError, db.DatabaseUnavailable) as error:
                         notice("error", friendly_error(error))
 
-        # 4. Results: the day just closed, every stand's prices and sales, and the ranking at the end.
-        with st.container(border=True, key=f"tournament_part_results_{tournament_id}"):
-            part_heading(4, "Results")
-            show_flash(f"t{tournament_id}_ready")
-            show_flash(f"t{tournament_id}_close")
-            if not screen["days"]:
-                notice("info", "Results appear here when the first day closes.")
-            else:
-                latest = screen["days"][-1]
-                st.markdown(f'<div class="part-caption">Day {latest["day"]}: every stand\'s price and units sold.</div>', unsafe_allow_html=True)
-                st.table(market_rows(latest, player))
-                if len(screen["days"]) > 1:
-                    with st.expander("Earlier days"):
-                        for day in reversed(screen["days"][:-1]):
-                            st.write(f"Day {day['day']}")
-                            st.table(market_rows(day, player))
+        # 4. Results: at the end of the tournament (ranking first), or for the organiser who does not play.
+        if not playing or own is None:
+            with st.container(border=True, key=f"tournament_part_results_{tournament_id}"):
+                part_heading(4, "Final results" if not playing else "Results")
+                show_ranking(screen)
+                show_results(screen, player, charts_open=not playing)
 
-            if screen["ranking"] is not None:
-                st.markdown('<div class="section-heading">Ranking</div>', unsafe_allow_html=True)
-                for position, row in enumerate(screen["ranking"], start=1):
-                    position_label = {1: "1st", 2: "2nd", 3: "3rd"}.get(position, str(position))
-                    tone = {1: "#F5A524", 2: "#C0C8D0", 3: "#CD7F32"}.get(position, "rgba(255,255,255,.12)")
-                    st.markdown(
-                        f'<div class="tournament-ranking-row">'
-                        f'<span style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;'
-                        f'border-radius:50%;background:{tone};color:#2B1608;font-weight:800">{position_label}</span>'
-                        f'<strong style="flex:1">{html.escape(str(logic.player_name(row["player"])))}</strong>'
-                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Gain<br><b style="color:var(--text)">€{row["gain"]:.2f}</b></span>'
-                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Final cash<br><b style="color:var(--text)">€{row["final_cash"]:.2f}</b></span>'
-                        f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Stock at cost<br><b style="color:var(--text)">€{row["stock_at_cost"]:.2f}</b></span></div>',
-                        unsafe_allow_html=True,
-                    )
+
+def show_ranking(screen):
+    # Podium order: gain first (CT R4), then seat.
+    if screen["ranking"] is not None:
+        st.markdown('<div class="section-heading">Ranking</div>', unsafe_allow_html=True)
+        for position, row in enumerate(screen["ranking"], start=1):
+            position_label = {1: "1st", 2: "2nd", 3: "3rd"}.get(position, str(position))
+            tone = {1: "#F5A524", 2: "#C0C8D0", 3: "#CD7F32"}.get(position, "rgba(255,255,255,.12)")
+            st.markdown(
+                f'<div class="tournament-ranking-row">'
+                f'<span style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;'
+                f'border-radius:50%;background:{tone};color:#2B1608;font-weight:800">{position_label}</span>'
+                f'<strong style="flex:1">{html.escape(str(logic.player_name(row["player"])))}</strong>'
+                f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Gain<br><b style="color:var(--text)">€{row["gain"]:.2f}</b></span>'
+                f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Final cash<br><b style="color:var(--text)">€{row["final_cash"]:.2f}</b></span>'
+                f'<span style="text-align:right;color:var(--muted);font-size:.78rem">Stock at cost<br><b style="color:var(--text)">€{row["stock_at_cost"]:.2f}</b></span></div>',
+                unsafe_allow_html=True,
+            )
 
 
 def tournaments_screen():
