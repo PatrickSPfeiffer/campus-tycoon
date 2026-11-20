@@ -4,6 +4,11 @@ import db
 import html
 import logic
 import mailer
+import reloader
+
+# After a merge Streamlit Cloud keeps the old db.py and logic.py in memory: reload them when their
+# files changed, so the new screens never call functions the old modules do not have.
+reloader.reload_changed([db, logic, mailer])
 
 DB_PATH = db.DEFAULT_PATH
 
