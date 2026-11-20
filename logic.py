@@ -1,6 +1,7 @@
 import csv
 import io
 import math
+import random
 import secrets
 
 import db
@@ -848,7 +849,17 @@ def tournament_list(db_path, player):
     return rows
 
 
-def tournament_screen(db_path, player, tournament_id, fetch):
+def simulated_weather(tournament_id, day):
+    """The weather of one tournament day: rain 30%, hot 25%, normal 45%.
+
+    The seed is the tournament and the day, so every player sees the same weather and each new
+    day can change it (specs/feature-tournament-clarity.md).
+    """
+    roll = random.Random(f"campus-tycoon-{tournament_id}-{day}").random()
+    return {"rain": roll < 0.30, "hot": 0.30 <= roll < 0.55}
+
+
+def tournament_screen(db_path, player, tournament_id, fetch=None):
     """Everything one tournament card shows, read with at most 5 statements once the weather is saved."""
     check_player(player)
     tournament = db.get_tournament(db_path, tournament_id)
@@ -861,10 +872,13 @@ def tournament_screen(db_path, player, tournament_id, fetch):
     day = tournament["day"]
     weather = db.get_tournament_weather(db_path, tournament_id, day)
     if weather is None:
-        try:
-            weather = read_weather(fetch())
-        except Exception:
-            weather = {"rain": False, "hot": False}
+        if fetch is None:
+            weather = simulated_weather(tournament_id, day)
+        else:
+            try:
+                weather = read_weather(fetch())
+            except Exception:
+                weather = {"rain": False, "hot": False}
         db.save_tournament_weather(db_path, tournament_id, day, weather)
     own = stands.get(player)
     ranking = None
@@ -965,3 +979,42 @@ def split_tournaments(rows):
     active = [row for row in rows if row["day"] <= RUN_DAYS]
     finished = [row for row in rows if row["day"] > RUN_DAYS]
     return active, finished
+
+
+# Tournament charts (specs/feature-tournament-clarity.md), from tournament_screen(...)["days"].
+
+def stand_gross_profit(stand, product):
+    # Same rounding as the day close: revenue and COGS rounded, then subtracted.
+    units = stand["units_sold"][product]
+    revenue = round(units * stand["price"][product], 2)
+    cogs = round(units * PRODUCTS[product]["unit_cost"], 2)
+    return round(revenue - cogs, 2)
+
+
+def tournament_chart_data(days, player):
+    """The player's gross profit per day by product and in total (like profit_chart_data)."""
+    data = {"Day": []}
+    for name in PRODUCTS:
+        data[name] = []
+    data["Total"] = []
+    for day in days:
+        stand = next((row for row in day["stands"] if row["player"] == player), None)
+        data["Day"].append(day["day"])
+        total = 0.0
+        for name in PRODUCTS:
+            gross_profit = stand_gross_profit(stand, name) if stand else 0.0
+            data[name].append(gross_profit)
+            total = total + gross_profit
+        data["Total"].append(round(total, 2))
+    return data
+
+
+def tournament_players_chart_data(days):
+    """Every player's total gross profit per day; the key is the player's name."""
+    data = {"Day": []}
+    for day in days:
+        data["Day"].append(day["day"])
+        for stand in day["stands"]:
+            total = round(sum(stand_gross_profit(stand, name) for name in PRODUCTS), 2)
+            data.setdefault(stand["name"], []).append(total)
+    return data
