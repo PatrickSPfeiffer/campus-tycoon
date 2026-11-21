@@ -242,6 +242,11 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 [class*="st-key-t"][class*="_ready_button"] button { min-height:3.75rem; box-shadow:0 0 26px rgba(255,122,24,.45); }
 [class*="st-key-t"][class*="_ready_button"] button p { font-size:1.3rem !important; font-weight:800 !important; }
 .part-caption { color:var(--muted); font-size:.9rem; margin:0 0 .6rem; }
+[class*="st-key-tournament_row_"] { box-sizing:border-box; padding:14px 18px !important; margin-bottom:.2rem; }
+[class*="st-key-tournament_row_"]:hover { transform:none !important; }
+.tournament-row { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.tournament-row-name { font-size:1.2rem; font-weight:800; color:var(--text); }
+.tournament-row-meta { color:var(--muted); font-size:.95rem; }
 .order-total { display:flex; align-items:center; min-height:2.2rem; padding:6px 12px; border-radius:10px; font-weight:700; font-size:.95rem; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); }
 .order-total-muted { color:var(--muted); font-weight:600; }
 .order-total-good { color:var(--teal); border-color:rgba(94,234,212,.35); background:rgba(94,234,212,.06); }
@@ -1113,7 +1118,54 @@ def show_ranking(screen):
             )
 
 
+def open_tournament(tournament_id):
+    # The open tournament lives in the address (?page=tournaments&tournament=<id>), so a reload stays on it.
+    st.query_params["page"] = "tournaments"
+    if tournament_id is None:
+        st.query_params.pop("tournament", None)
+    else:
+        st.query_params["tournament"] = str(tournament_id)
+
+
+def tournament_row(row):
+    # One running tournament in the list: name, code, day, the player's role, and Open.
+    if row["playing"]:
+        status = "Playing · Ready" if row.get("ready") else "Playing · Not ready"
+    else:
+        status = "Organiser"
+    with st.container(border=True, key=f"tournament_row_{row['id']}"):
+        text_column, open_column = st.columns([5, 1], vertical_alignment="center")
+        with text_column:
+            st.markdown(
+                f'<div class="tournament-row"><span class="tournament-row-name">{html.escape(str(row["name"]))}</span>'
+                f'<span class="code-badge">{html.escape(str(row["code"]))}</span>'
+                f'<span class="tournament-row-meta">Day {row["day"]} of {logic.RUN_DAYS} · {status}</span></div>',
+                unsafe_allow_html=True,
+            )
+        with open_column:
+            st.button("Open", key=f"tournament_open_{row['id']}", icon=":material/arrow_forward:", type="primary",
+                      use_container_width=True, on_click=open_tournament, args=(row["id"],))
+
+
 def tournaments_screen():
+    try:
+        # Joined and organised tournaments: an organiser who does not play still sees theirs.
+        my_stands = logic.tournament_list(DB_PATH, PLAYER)
+    except (ValueError, db.DatabaseUnavailable) as error:
+        notice("error", friendly_error(error))
+        my_stands = []
+
+    # One tournament open: only its card, and a way back to the list.
+    opened = logic.find_tournament(my_stands, st.query_params.get("tournament"))
+    if opened is not None:
+        st.button("All tournaments", key="tournaments_back_button", icon=":material/arrow_back:",
+                  on_click=open_tournament, args=(None,))
+        message = st.session_state.pop("tournament_message", None)
+        if message:
+            notice("success", message)
+        tournament_card(opened["id"], PLAYER)
+        return
+
     create_column, join_column = st.columns(2)
     with create_column:
         with st.container(border=True):
@@ -1122,17 +1174,13 @@ def tournaments_screen():
             if st.button("Create tournament", key="tournament_create_button", type="primary", icon=":material/add_circle:", use_container_width=True):
                 try:
                     created = logic.create_tournament(DB_PATH, PLAYER, tournament_name)
-                    st.session_state["created_tournament"] = created
+                    st.session_state["tournament_message"] = (
+                        f"Tournament created: {created['name']}. Share the code {created['code']} with the players."
+                    )
+                    open_tournament(created["id"])
                     st.rerun()
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
-            created = st.session_state.pop("created_tournament", None)
-            if created:
-                notice("success", f"Tournament created: {created['name']}")
-                st.markdown(
-                    f'Share this code: <span class="join-code-big">{html.escape(created["code"])}</span>',
-                    unsafe_allow_html=True,
-                )
 
     with join_column:
         with st.container(border=True):
@@ -1141,33 +1189,22 @@ def tournaments_screen():
             if st.button("Join tournament", key="tournament_join_button", icon=":material/login:", use_container_width=True):
                 try:
                     joined = logic.join_tournament(DB_PATH, PLAYER, join_code)
-                    st.session_state["joined_message"] = (
-                        f"Joined {joined['name']} in seat {joined['seat']}."
-                    )
+                    st.session_state["tournament_message"] = f"Joined {joined['name']} in seat {joined['seat']}."
+                    open_tournament(joined["id"])
                     st.rerun()
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
-            joined_message = st.session_state.pop("joined_message", None)
-            if joined_message:
-                notice("success", joined_message)
 
-    try:
-        # Joined and organised tournaments: an organiser who does not play still sees theirs.
-        my_stands = logic.tournament_list(DB_PATH, PLAYER)
-    except (ValueError, db.DatabaseUnavailable) as error:
-        notice("error", friendly_error(error))
-        my_stands = []
-
+    active, finished = logic.split_tournaments(my_stands)
     if not my_stands:
         notice("info", "You have no tournaments yet. Create one or join one with a code.")
-    active, finished = logic.split_tournaments(my_stands)
     if active:
-        section_heading("trophy", "My tournament stands")
-        for stand in active:
-            tournament_card(stand["id"], PLAYER)
+        section_heading("trophy", "Tournaments in progress")
+        for row in logic.newest_first(active):
+            tournament_row(row)
     if finished:
         with st.expander(f"Finished tournaments ({len(finished)})"):
-            for stand in finished:
+            for stand in logic.newest_first(finished):
                 tournament_card(stand["id"], PLAYER)
 
 
@@ -1205,6 +1242,7 @@ PAGES = [card[0] for card in HOME_CARDS]
 
 def open_page(page):
     # The open screen lives in the address (?page=...), so a reload stays on it.
+    st.query_params.pop("tournament", None)
     if page in PAGES:
         st.query_params["page"] = page
     else:

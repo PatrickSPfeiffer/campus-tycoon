@@ -1018,3 +1018,19 @@ def tournament_players_chart_data(days):
             total = round(sum(stand_gross_profit(stand, name) for name in PRODUCTS), 2)
             data.setdefault(stand["name"], []).append(total)
     return data
+
+
+# One tournament at a time (specs/feature-tournament-pages.md).
+
+def newest_first(rows):
+    """The same tournaments, the most recent (highest id) first."""
+    return sorted(rows, key=lambda row: row["id"], reverse=True)
+
+
+def find_tournament(rows, value):
+    """The row whose id is the number in value (text from the address or a number), else None."""
+    try:
+        tournament_id = int(value)
+    except (TypeError, ValueError):
+        return None
+    return next((row for row in rows if row["id"] == tournament_id), None)
