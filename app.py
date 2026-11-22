@@ -247,7 +247,7 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 .tournament-row { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
 .tournament-row-name { font-size:1.2rem; font-weight:800; color:var(--text); }
 .tournament-row-meta { color:var(--muted); font-size:.95rem; }
-.order-total { display:flex; align-items:center; min-height:2.2rem; padding:6px 12px; border-radius:10px; font-weight:700; font-size:.95rem; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); }
+.order-total { display:flex; align-items:center; min-height:2.2rem; margin:0 0 .75rem; padding:6px 12px; border-radius:10px; font-weight:700; font-size:.95rem; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); }
 .order-total-muted { color:var(--muted); font-weight:600; }
 .order-total-good { color:var(--teal); border-color:rgba(94,234,212,.35); background:rgba(94,234,212,.06); }
 .order-total-bad { color:var(--bad); border-color:rgba(248,113,113,.45); background:rgba(248,113,113,.08); }
@@ -543,7 +543,7 @@ def practice_plan(game, preview, run_complete, buy_round, price_round, day_text)
                     notice("error", friendly_error(error))
 
 
-# The Practice screen is a fragment: its buttons rerun only this screen, not the whole app.
+# The Practice screen is a fragment: typing reruns only this screen; buttons rerun the whole page (no stale boxes).
 # Top to bottom (specs/feature-practice-layout.md): New run bar, 1 money, final result, 2 plan, 3 trade, results.
 @st.fragment
 def practice_screen():
@@ -578,7 +578,7 @@ def practice_screen():
             if not st.session_state.get("confirm_new_run"):
                 if st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:"):
                     st.session_state["confirm_new_run"] = True
-                    st.rerun(scope="fragment")
+                    st.rerun()
         if st.session_state.get("confirm_new_run"):
             notice("warning", f"Start a new {new_level} run? The current run and its history will be lost.")
             col1, col2 = st.columns(2)
@@ -589,12 +589,12 @@ def practice_screen():
                     # New keys for the price and How many fields, so they show the new run's prices and 0.
                     st.session_state["practice_price_round"] = price_round + 1
                     st.session_state["practice_buy_round"] = buy_round + 1
-                    st.rerun(scope="fragment")
+                    st.rerun()
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
             if col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:"):
                 st.session_state["confirm_new_run"] = False
-                st.rerun(scope="fragment")
+                st.rerun()
 
     # 1. Your day and money: four boxes of the same size.
     with st.container(border=True, key="practice_part_money"):
@@ -629,7 +629,7 @@ def practice_screen():
                     try:
                         logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
                         flash("practice", "Loan taken.", kind="toast")
-                        st.rerun(scope="fragment")
+                        st.rerun()
                     except (ValueError, db.DatabaseUnavailable) as error:
                         notice("error", friendly_error(error))
 
@@ -700,7 +700,7 @@ def practice_screen():
                                 PLAYER, logic.final_result(game)
                             )
                     st.session_state["practice_buy_round"] = buy_round + 1
-                    st.rerun(scope="fragment")
+                    st.rerun()
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
 
@@ -815,7 +815,12 @@ def show_tournament_charts(screen, player):
     with chart_right if screen["stand"] is not None else chart_left:
         with st.container(border=True):
             st.write("Gross profit per day: every player")
-            st.bar_chart(everyone, x="Day", y=player_names, stack=False, x_label="Day", y_label="Gross profit (€)")
+            palette = ["#F5A524", "#5EEAD4", "#FF7A18", "#A78BFA", "#F472B6", "#60A5FA", "#34D399", "#FBBF24"]
+            st.bar_chart(
+                everyone, x="Day", y=player_names, stack=False,
+                color=[palette[index % len(palette)] for index in range(len(player_names))],
+                x_label="Day", y_label="Gross profit (€)",
+            )
 
 
 def show_results(screen, player, charts_open):
@@ -953,7 +958,7 @@ def tournament_card(tournament_id, player):
         with header_refresh:
             # The brief asks for a Refresh button instead of live updates: it reloads only this card.
             if st.button("Refresh", key=f"t{tournament_id}_refresh_button", icon=":material/refresh:", use_container_width=True):
-                st.rerun(scope="fragment")
+                st.rerun()
 
         weather_tints = {
             "rain": ("rgba(96,165,250,0.30)", "rgba(30,64,175,0.15)"),
@@ -994,7 +999,7 @@ def tournament_card(tournament_id, player):
                 try:
                     joined = logic.join_tournament(DB_PATH, player, screen["code"])
                     flash(f"t{tournament_id}_join", f"You joined {joined['name']} in seat {joined['seat']}.")
-                    st.rerun(scope="fragment")
+                    st.rerun()
                 except (ValueError, db.DatabaseUnavailable) as error:
                     notice("error", friendly_error(error))
         elif playing:
@@ -1030,7 +1035,7 @@ def tournament_card(tournament_id, player):
                             try:
                                 logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, machine)
                                 flash(f"t{tournament_id}_upgrade", "Upgrade purchased.")
-                                st.rerun(scope="fragment")
+                                st.rerun()
                             except (ValueError, db.DatabaseUnavailable) as error:
                                 notice("error", friendly_error(error))
 
@@ -1062,7 +1067,7 @@ def tournament_card(tournament_id, player):
                                 flash(f"t{tournament_id}_ready", result["closed_day"], kind="closed_day")
                             else:
                                 flash(f"t{tournament_id}_ready", "You are Ready.")
-                            st.rerun(scope="fragment")
+                            st.rerun()
                         except (ValueError, db.DatabaseUnavailable) as error:
                             notice("error", friendly_error(error))
                     elif is_ready and playing:
@@ -1074,7 +1079,7 @@ def tournament_card(tournament_id, player):
                             try:
                                 closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
                                 flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
-                                st.rerun(scope="fragment")
+                                st.rerun()
                             except (ValueError, db.DatabaseUnavailable) as error:
                                 notice("error", friendly_error(error))
         if own is None:
@@ -1087,7 +1092,7 @@ def tournament_card(tournament_id, player):
                     try:
                         closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
                         flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
-                        st.rerun(scope="fragment")
+                        st.rerun()
                     except (ValueError, db.DatabaseUnavailable) as error:
                         notice("error", friendly_error(error))
 
