@@ -250,6 +250,7 @@ html, body, [class*="css"] { font-family:'Plus Jakarta Sans', sans-serif; }
 .tournament-row-name { font-size:1.2rem; font-weight:800; color:var(--text); }
 .tournament-row-meta { color:var(--muted); font-size:.95rem; }
 .order-total { display:flex; align-items:center; min-height:2.2rem; margin:0 0 .75rem; padding:6px 12px; border-radius:10px; font-weight:700; font-size:.95rem; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.10); }
+button:disabled, button:disabled:hover { opacity:.42 !important; box-shadow:none !important; filter:saturate(.4); cursor:not-allowed !important; transform:none !important; }
 .order-total-muted { color:var(--muted); font-weight:600; }
 .order-total-good { color:var(--teal); border-color:rgba(94,234,212,.35); background:rgba(94,234,212,.06); }
 .order-total-bad { color:var(--bad); border-color:rgba(248,113,113,.45); background:rgba(248,113,113,.08); }
@@ -649,7 +650,7 @@ def practice_screen():
                 has_loan = game["debt"] > 0
                 loan_amount = st.number_input(
                     "Take a loan (€)", min_value=1, max_value=logic.LOAN_MAX, step=1, value=logic.LOAN_MAX,
-                    key="loan_amount",
+                    key="loan_amount", disabled=run_complete or has_loan,
                     help=(
                         f"Borrow up to €{logic.LOAN_MAX} once per run. You pay it back with "
                         f"{logic.LOAN_INTEREST:.0%} interest: the debt is subtracted from your final gain."
@@ -737,7 +738,7 @@ def practice_screen():
         notice("info", "Trade a day to see your results.")
     else:
         show_practice_day(results[-1])
-        with st.expander("Charts and all days"):
+        with st.expander("Charts and all days", expanded=run_complete):
             # History charts: built only from this player's own saved results.
             chart_data = logic.profit_chart_data(results)
             chart_data["Day"] = [f"Day {day}" for day in chart_data["Day"]]
@@ -748,14 +749,14 @@ def practice_screen():
                     st.bar_chart(
                         chart_data, x="Day", y=list(logic.PRODUCTS), stack=False,
                         color=["#F5A524", "#FF7A18", "#5EEAD4"],
-                        x_label="Day", y_label="Gross profit (€)",
+                        x_label="Day", y_label="Gross profit (€)", height=320,
                     )
             with chart_col2:
                 with st.container(border=True):
                     st.write("Total gross profit per day")
                     st.bar_chart(
                         chart_data, x="Day", y="Total", color="#F5A524",
-                        x_label="Day", y_label="Gross profit (€)",
+                        x_label="Day", y_label="Gross profit (€)", height=320,
                     )
             for result in reversed(results[:-1]):
                 show_practice_day(result)
@@ -831,7 +832,7 @@ def show_tournament_charts(screen, player):
                 st.write("Your gross profit per day by product")
                 st.bar_chart(
                     own, x="Day", y=list(logic.PRODUCTS), stack=False,
-                    color=["#F5A524", "#FF7A18", "#5EEAD4"], x_label="Day", y_label="Gross profit (€)",
+                    color=["#F5A524", "#FF7A18", "#5EEAD4"], x_label="Day", y_label="Gross profit (€)", height=320,
                 )
     with chart_right if screen["stand"] is not None else chart_left:
         with st.container(border=True):
@@ -840,7 +841,7 @@ def show_tournament_charts(screen, player):
             st.bar_chart(
                 everyone, x="Day", y=player_names, stack=False,
                 color=[palette[index % len(palette)] for index in range(len(player_names))],
-                x_label="Day", y_label="Gross profit (€)",
+                x_label="Day", y_label="Gross profit (€)", height=320,
             )
 
 
@@ -1255,7 +1256,7 @@ def help_screen():
     ]
     upgrade_cost = next(details["cost"] for details in logic.UPGRADES.values())
     help_content.append(("users", "Tournaments", "Create a tournament and share its join code, or join one with a code. All players share the same customers: 10 per player and product each day, half budget (they pay up to the reference price) and half premium (up to twice it). The cheapest stand sells first."))
-    help_content.append(("cloud-sun", "A tournament day", "Buy stock and set prices, then press Ready. The day closes when everyone is Ready or the organiser presses Close day now. Press Refresh to see who is ready. After each day, Market results show every stand's price and units sold. Rain raises the Café reference to €5.00, heat raises Water to €1.50, and the Coffee machine (€" + f"{upgrade_cost:.2f}" + ") raises your Café reference to €5.00: each card shows your reference today."))
+    help_content.append(("cloud-sun", "A tournament day", "Buy stock and set prices, then press Ready. The day closes when everyone is Ready or the organiser presses Close day now. Press Refresh to see who is ready. After each day, the Day N results show every stand's price and units sold. The weather is drawn for each tournament day, the same for every player: rain raises the Café reference to €5.00, heat raises Water to €1.50, and the Coffee machine (€" + f"{upgrade_cost:.2f}" + ") raises your Café reference to €5.00: each card shows your reference today."))
     levels = ", ".join(f"{name} €{cash:.0f}" for name, cash in logic.DIFFICULTY_LEVELS.items())
     help_content.append(("trophy", "Final gain", "After day 5: final cash + leftover stock valued at its unit cost − the cash you started with − the loan to repay. The ranking of a tournament uses the same gain (tournaments have no loans)."))
     help_content.append(("box", "Difficulty", f"Practice runs start with different cash: {levels}. The rules are the same; less cash means fewer units you can buy on day 1."))
