@@ -6,6 +6,16 @@ all players share the same customers, so the cheapest stand sells first.
 
 **Live app:** https://price-war-game.streamlit.app/
 
+## Objectives
+- Let Nova students practise simple business decisions (buying stock, pricing against a reference price, managing cash) in a game that takes a few minutes.
+- Turn those decisions into a competition: in a tournament, players share one market, so the best price depends on what the others do.
+- Build it with the course's workflow: one spec per feature, tests first, every pull request reviewed by a teammate, and a deployed app.
+
+## Two game modes
+**Practice** is a solo run to learn the mechanics without pressure: demand is fixed, so a player can try prices and see what works.
+
+**Tournament** is the real game: same products, costs and five days, but the customers are shared and the cheapest stand sells first, so a price that worked in Practice can be undercut. Everyone starts with €100 and there are no loans, so the ranking is fair.
+
 ## Team
 
 | Name | Student number |
@@ -15,6 +25,13 @@ all players share the same customers, so the cheapest stand sells first.
 | Filippo Bortignon | 74819 |
 | Zoe Mormile | 65404 |
 | Edoardo Giovanni Panetta | 72795 |
+
+## Installation
+1. Install uv: see https://docs.astral.sh/uv/getting-started/installation/ (on a Mac: `brew install uv`).
+2. Clone the repository: `git clone https://github.com/PatrickSPfeiffer/campus-tycoon.git`, then `cd campus-tycoon`.
+3. Install the dependencies: `uv sync` (exact versions from uv.lock).
+
+Then follow "Run the app locally" and "Run the tests" below.
 
 ## Run the app locally
 
