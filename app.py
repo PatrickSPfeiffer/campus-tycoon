@@ -42,6 +42,8 @@ def show_flash(scope):
         show_closed_day(message, PLAYER, scope)
     elif kind == "toast":
         st.toast(message)
+    elif kind == "toast_error":
+        st.toast(message, icon=":material/error:")
     elif kind == "error":
         notice("error", message)
     elif kind == "info":
@@ -441,106 +443,145 @@ def order_total(quantities, cash, key):
 
 @st.fragment
 def practice_plan(game, preview, run_complete, buy_round, price_round, day_text):
-    with st.container(border=True, key="practice_part_plan"):
-        part_heading(2, f"Plan {day_text}")
-        # The demand rule stays visible (brief CT03), so players can choose a price with it.
-        st.markdown(
-            f'<div class="plan-rule"><span class="plan-rule-icon">{icon("info", 16)}</span>Customers per day: '
-            "<b>10</b> at or below the reference price · <b>5</b> up to twice it · <b>0</b> above that.</div>",
-            unsafe_allow_html=True,
-        )
-        with st.container(key="practice_plan_headings"):
-            buy_heading, _, sell_heading = st.columns(PLAN_SIDES)
-            buy_heading.markdown('<div class="plan-heading plan-heading-buy">Buy from the supplier</div>', unsafe_allow_html=True)
-            sell_heading.markdown('<div class="plan-heading plan-heading-sell">Sell to customers</div>', unsafe_allow_html=True)
-        quantities = {}
-        new_prices = {}
-        for name, details in logic.PRODUCTS.items():
-            reference = details["reference_price"]
-            with st.container(key=f"practice_line_{name}"):
-                buy_side, arrow, sell_side = st.columns(PLAN_SIDES, vertical_alignment="center")
-                with buy_side:
-                    with st.container(key=f"practice_buy_side_{name}"):
-                        name_column, cost_column, quantity_column = st.columns([1.3, 1, 1], vertical_alignment="top")
-                        name_column.markdown(
-                            f'<div class="plan-product">{icon(PRODUCT_ICONS.get(name, "box"))}'
-                            f'<div><div class="plan-product-name">{html.escape(name)}</div>'
-                            f'<div class="plan-product-stock">{game["stock"][name]} in stock</div></div></div>',
-                            unsafe_allow_html=True,
+    # Drawn inside the part 2 box of practice_screen; the Buy and Save buttons are below it there.
+    with st.container(key="practice_plan_headings"):
+        buy_heading, _, sell_heading = st.columns(PLAN_SIDES)
+        buy_heading.markdown('<div class="plan-heading plan-heading-buy">Buy from the supplier</div>', unsafe_allow_html=True)
+        sell_heading.markdown('<div class="plan-heading plan-heading-sell">Sell to customers</div>', unsafe_allow_html=True)
+    quantities = {}
+    new_prices = {}
+    for name, details in logic.PRODUCTS.items():
+        reference = details["reference_price"]
+        with st.container(key=f"practice_line_{name}"):
+            buy_side, arrow, sell_side = st.columns(PLAN_SIDES, vertical_alignment="center")
+            with buy_side:
+                with st.container(key=f"practice_buy_side_{name}"):
+                    name_column, cost_column, quantity_column = st.columns([1.3, 1, 1], vertical_alignment="top")
+                    name_column.markdown(
+                        f'<div class="plan-product">{icon(PRODUCT_ICONS.get(name, "box"))}'
+                        f'<div><div class="plan-product-name">{html.escape(name)}</div>'
+                        f'<div class="plan-product-stock">{game["stock"][name]} in stock</div></div></div>',
+                        unsafe_allow_html=True,
+                    )
+                    with cost_column:
+                        plan_label("Supplier price")
+                        plan_value(f"€{details['unit_cost']:.2f}")
+                    with quantity_column:
+                        plan_label("How many")
+                        quantities[name] = st.number_input(
+                            f"How many {name}", min_value=0, step=1, value=0,
+                            key=f"practice_buy_{name}_{buy_round}", disabled=run_complete,
+                            label_visibility="collapsed",
                         )
-                        with cost_column:
-                            plan_label("Supplier price")
-                            plan_value(f"€{details['unit_cost']:.2f}")
-                        with quantity_column:
-                            plan_label("How many")
-                            quantities[name] = st.number_input(
-                                f"How many {name}", min_value=0, step=1, value=0,
-                                key=f"practice_buy_{name}_{buy_round}", disabled=run_complete,
-                                label_visibility="collapsed",
-                            )
-                arrow.markdown('<div class="plan-arrow">→</div>', unsafe_allow_html=True)
-                with sell_side:
-                    with st.container(key=f"practice_sell_side_{name}"):
-                        reference_column, price_column, sells_column = st.columns(3, vertical_alignment="top")
-                        with reference_column:
-                            plan_label("Reference price")
-                            plan_value(f"€{reference:.2f}", plain=True)
-                        with price_column:
-                            plan_label(
-                                "Your selling price (€)",
-                                help=(
-                                    f"Up to €{reference:.2f}: 10 customers a day. Up to €{2 * reference:.2f}: 5. "
-                                    "Above that: none."
-                                ),
-                            )
-                            new_prices[name] = st.number_input(
-                                f"Your selling price for {name} (€)",
-                                # No min or max here: logic.check_price refuses with a clear message.
-                                step=0.01, value=game["price"][name], format="%.2f", key=f"practice_price_{name}_{price_round}",
-                                disabled=run_complete, label_visibility="collapsed",
-                            )
-                        with sells_column:
-                            plan_label("Will sell")
-                            plan_value(preview[name]["will_sell"])
-        total_column, _, save_note_column = st.columns(PLAN_SIDES)
-        with total_column:
-            order_total(quantities, game["cash"], "practice_order_total")
-        with save_note_column:
-            changed = changed_prices(new_prices, game["price"])
-            note = "Prices changed: press Save selling prices." if changed else "Prices are saved."
-            st.markdown(f'<div class="order-total order-total-muted">{note}</div>', unsafe_allow_html=True)
-        buy_button_column, _, save_button_column = st.columns(PLAN_SIDES)
-        with buy_button_column:
-            buy_clicked = st.button(
-                "Buy stock", key="practice_buy_button", icon=":material/shopping_cart:",
-                disabled=run_complete, use_container_width=True,
-            )
-        with save_button_column:
-            save_clicked = st.button(
-                "Save selling prices", key="practice_save_prices_button", icon=":material/sell:",
-                disabled=run_complete, use_container_width=True,
-            )
+            arrow.markdown('<div class="plan-arrow">→</div>', unsafe_allow_html=True)
+            with sell_side:
+                with st.container(key=f"practice_sell_side_{name}"):
+                    reference_column, price_column, sells_column = st.columns(3, vertical_alignment="top")
+                    with reference_column:
+                        plan_label("Reference price")
+                        plan_value(f"€{reference:.2f}", plain=True)
+                    with price_column:
+                        plan_label(
+                            "Your selling price (€)",
+                            help=(
+                                f"Up to €{reference:.2f}: 10 customers a day. Up to €{2 * reference:.2f}: 5. "
+                                "Above that: none."
+                            ),
+                        )
+                        new_prices[name] = st.number_input(
+                            f"Your selling price for {name} (€)",
+                            # No min or max here: logic.check_price refuses with a clear message.
+                            step=0.01, value=game["price"][name], format="%.2f", key=f"practice_price_{name}_{price_round}",
+                            disabled=run_complete, label_visibility="collapsed",
+                        )
+                    with sells_column:
+                        plan_label("Will sell")
+                        plan_value(preview[name]["will_sell"])
+    total_column, _, save_note_column = st.columns(PLAN_SIDES)
+    with total_column:
+        order_total(quantities, game["cash"], "practice_order_total")
+    with save_note_column:
+        changed = changed_prices(new_prices, game["price"])
+        note = "Prices changed: press Save selling prices." if changed else "Prices are saved."
+        st.markdown(f'<div class="order-total order-total-muted">{note}</div>', unsafe_allow_html=True)
 
-        # Each button does only its own job. After it, the whole Practice screen reruns (cash and stock change).
-        if buy_clicked:
-            order = {name: int(value) for name, value in quantities.items()}
-            try:
-                logic.buy_many(DB_PATH, PLAYER, order)
-                flash("practice", f"Stock bought for €{logic.order_cost({n: q for n, q in order.items() if q > 0}):.2f}.", kind="toast")
-                st.session_state["practice_buy_round"] = buy_round + 1
-                st.rerun()
-            except (ValueError, db.DatabaseUnavailable) as error:
-                notice("error", friendly_error(error))
-        if save_clicked:
-            if not changed:
-                notice("info", "No price changed.")
-            else:
-                try:
-                    logic.set_prices(DB_PATH, PLAYER, changed)
-                    flash("practice", "Prices updated.", kind="toast")
-                    st.rerun()
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
+
+
+# Button actions run as callbacks, before the screen is drawn again (specs/fix-ghost-elements.md).
+# No st.rerun() inside a fragment: a rerun that stops a half-drawn fragment left old boxes on screen.
+def typed_practice_order(buy_round):
+    return {name: int(st.session_state.get(f"practice_buy_{name}_{buy_round}", 0) or 0) for name in logic.PRODUCTS}
+
+
+def typed_practice_prices(price_round, saved):
+    return {name: st.session_state.get(f"practice_price_{name}_{price_round}", saved[name]) for name in logic.PRODUCTS}
+
+
+def practice_buy(buy_round):
+    order = typed_practice_order(buy_round)
+    try:
+        logic.buy_many(DB_PATH, PLAYER, order)
+        flash("practice", f"Stock bought for €{logic.order_cost({n: q for n, q in order.items() if q > 0}):.2f}.", kind="toast")
+        st.session_state["practice_buy_round"] = buy_round + 1
+    except (ValueError, db.DatabaseUnavailable) as error:
+        flash("practice", friendly_error(error), kind="toast_error")
+
+
+def practice_save_prices(price_round):
+    try:
+        saved = logic.load_game(DB_PATH, PLAYER)["price"]
+        changed = changed_prices(typed_practice_prices(price_round, saved), saved)
+        if not changed:
+            flash("practice", "No price changed.", kind="toast")
+            return
+        logic.set_prices(DB_PATH, PLAYER, changed)
+        flash("practice", "Prices updated.", kind="toast")
+    except (ValueError, db.DatabaseUnavailable) as error:
+        flash("practice", friendly_error(error), kind="toast_error")
+
+
+def practice_confirm_new_run(level, buy_round, price_round):
+    try:
+        logic.new_run(DB_PATH, PLAYER, level)
+        st.session_state["confirm_new_run"] = False
+        # New keys for the price and How many fields, so they show the new run's prices and 0.
+        st.session_state["practice_price_round"] = price_round + 1
+        st.session_state["practice_buy_round"] = buy_round + 1
+    except (ValueError, db.DatabaseUnavailable) as error:
+        flash("practice", friendly_error(error), kind="error")
+
+
+def practice_take_loan():
+    try:
+        logic.take_loan(DB_PATH, PLAYER, int(st.session_state.get("loan_amount", logic.LOAN_MAX)))
+        flash("practice", "Loan taken.", kind="toast")
+    except (ValueError, db.DatabaseUnavailable) as error:
+        flash("practice", friendly_error(error), kind="error")
+
+
+def practice_trade(buy_round, price_round):
+    # Typed but not bought or saved: the day is not traded, so nothing is lost by surprise.
+    try:
+        game = logic.load_game(DB_PATH, PLAYER)
+        typed_quantities = any(quantity > 0 for quantity in typed_practice_order(buy_round).values())
+        unsaved_prices = bool(changed_prices(typed_practice_prices(price_round, game["price"]), game["price"]))
+        if typed_quantities:
+            flash("practice_trade", "You typed quantities but did not buy them. Press Buy stock first, or set How many to 0.", kind="warning")
+            return
+        if unsaved_prices:
+            flash("practice_trade", "Your new selling prices are not saved yet. Press Save selling prices first.", kind="warning")
+            return
+        logic.trade_day(DB_PATH, PLAYER)
+        game = logic.load_game(DB_PATH, PLAYER)
+        if logic.is_run_complete(game):
+            st.session_state["email_status"] = mailer.send_result_email(PLAYER, logic.final_result(game))
+        st.session_state["practice_buy_round"] = buy_round + 1
+    except (ValueError, db.DatabaseUnavailable) as error:
+        flash("practice_trade", friendly_error(error), kind="error")
+
+
+def set_state(name, value):
+    st.session_state[name] = value
 
 
 # The Practice screen is a fragment: typing reruns only this screen; buttons rerun the whole page (no stale boxes).
@@ -576,25 +617,15 @@ def practice_screen():
             )
         with button_column:
             if not st.session_state.get("confirm_new_run"):
-                if st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:"):
-                    st.session_state["confirm_new_run"] = True
-                    st.rerun()
+                st.button("Start a new run", key="practice_new_run_button", icon=":material/restart_alt:",
+                          on_click=set_state, args=("confirm_new_run", True))
         if st.session_state.get("confirm_new_run"):
             notice("warning", f"Start a new {new_level} run? The current run and its history will be lost.")
             col1, col2 = st.columns(2)
-            if col1.button("Yes, start a new run", key="practice_confirm_new_run_button", icon=":material/check:"):
-                try:
-                    logic.new_run(DB_PATH, PLAYER, new_level)
-                    st.session_state["confirm_new_run"] = False
-                    # New keys for the price and How many fields, so they show the new run's prices and 0.
-                    st.session_state["practice_price_round"] = price_round + 1
-                    st.session_state["practice_buy_round"] = buy_round + 1
-                    st.rerun()
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
-            if col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:"):
-                st.session_state["confirm_new_run"] = False
-                st.rerun()
+            col1.button("Yes, start a new run", key="practice_confirm_new_run_button", icon=":material/check:",
+                        on_click=practice_confirm_new_run, args=(new_level, buy_round, price_round))
+            col2.button("Cancel", key="practice_cancel_new_run_button", icon=":material/close:",
+                        on_click=set_state, args=("confirm_new_run", False))
 
     # 1. Your day and money: four boxes of the same size.
     with st.container(border=True, key="practice_part_money"):
@@ -625,13 +656,8 @@ def practice_screen():
                     ),
                 )
                 st.caption(f"You will owe €{logic.loan_debt(int(loan_amount)):.2f}")
-                if st.button("Take loan", key="practice_loan_button", icon=":material/account_balance_wallet:", disabled=run_complete or has_loan, use_container_width=True):
-                    try:
-                        logic.take_loan(DB_PATH, PLAYER, int(loan_amount))
-                        flash("practice", "Loan taken.", kind="toast")
-                        st.rerun()
-                    except (ValueError, db.DatabaseUnavailable) as error:
-                        notice("error", friendly_error(error))
+                st.button("Take loan", key="practice_loan_button", icon=":material/account_balance_wallet:",
+                          disabled=run_complete or has_loan, use_container_width=True, on_click=practice_take_loan)
 
     if run_complete:
         final = logic.final_result(game)
@@ -651,7 +677,28 @@ def practice_screen():
 
     # 2. Plan the day: its own small fragment, so typing a quantity or a price reruns only this part
     # (no database read) and the total cost of the order shows at once.
-    practice_plan(game, preview, run_complete, buy_round, price_round, day_text)
+    with st.container(border=True, key="practice_part_plan"):
+        part_heading(2, f"Plan {day_text}")
+        # The demand rule stays visible (brief CT03), so players can choose a price with it.
+        st.markdown(
+            f'<div class="plan-rule"><span class="plan-rule-icon">{icon("info", 16)}</span>Customers per day: '
+            "<b>10</b> at or below the reference price · <b>5</b> up to twice it · <b>0</b> above that.</div>",
+            unsafe_allow_html=True,
+        )
+        practice_plan(game, preview, run_complete, buy_round, price_round, day_text)
+        # The buttons belong to the screen (not the small plan fragment), so after them the whole
+        # screen is drawn again: cash, stock and part 3 are current.
+        buy_button_column, _, save_button_column = st.columns(PLAN_SIDES)
+        with buy_button_column:
+            st.button(
+                "Buy stock", key="practice_buy_button", icon=":material/shopping_cart:",
+                disabled=run_complete, use_container_width=True, on_click=practice_buy, args=(buy_round,),
+            )
+        with save_button_column:
+            st.button(
+                "Save selling prices", key="practice_save_prices_button", icon=":material/sell:",
+                disabled=run_complete, use_container_width=True, on_click=practice_save_prices, args=(price_round,),
+            )
 
     # 3. Trade the day: the most visible part.
     with st.container(border=True, key="practice_part_trade"):
@@ -672,37 +719,11 @@ def practice_screen():
             for warning in logic.trade_warnings(game["stock"], game["price"]):
                 notice("warning", warning)
         trade_label = "Run complete" if run_complete else f"Trade day {game['day']}"
-        if st.button(
+        show_flash("practice_trade")
+        st.button(
             trade_label, key="practice_trade_day_button", type="primary", icon=":material/play_arrow:",
-            disabled=run_complete, use_container_width=True,
-        ):
-            # Typed but not bought or saved: the day is not traded, so nothing is lost by surprise.
-            # The fields keep their values in session state (their keys include the round).
-            typed_quantities = any(
-                int(st.session_state.get(f"practice_buy_{name}_{buy_round}", 0) or 0) > 0 for name in logic.PRODUCTS
-            )
-            typed_prices = {
-                name: st.session_state.get(f"practice_price_{name}_{price_round}", game["price"][name])
-                for name in logic.PRODUCTS
-            }
-            unsaved_prices = bool(changed_prices(typed_prices, game["price"]))
-            if typed_quantities:
-                notice("warning", "You typed quantities but did not buy them. Press Buy stock first, or set How many to 0.")
-            if unsaved_prices:
-                notice("warning", "Your new selling prices are not saved yet. Press Save selling prices first.")
-            if not typed_quantities and not unsaved_prices:
-                try:
-                    logic.trade_day(DB_PATH, PLAYER)
-                    game = logic.load_game(DB_PATH, PLAYER)
-                    if logic.is_run_complete(game):
-                        with st.spinner("Sending your result by email..."):
-                            st.session_state["email_status"] = mailer.send_result_email(
-                                PLAYER, logic.final_result(game)
-                            )
-                    st.session_state["practice_buy_round"] = buy_round + 1
-                    st.rerun()
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
+            disabled=run_complete, use_container_width=True, on_click=practice_trade, args=(buy_round, price_round),
+        )
 
     # 4. Results: the latest day stays visible, the rest folds away.
     section_heading("trending-up", "Results")
@@ -897,36 +918,68 @@ def tournament_plan(tournament_id, player, own, references, can_act):
     with save_note_column:
         note = "Prices changed: press Save selling prices." if changed else "Prices are saved."
         st.markdown(f'<div class="order-total order-total-muted">{note}</div>', unsafe_allow_html=True)
-    buy_button_column, _, save_button_column = st.columns(PLAN_SIDES)
-    with buy_button_column:
-        buy_clicked = st.button("Buy stock", key=f"t{tournament_id}_buy_button", icon=":material/shopping_cart:", disabled=not can_act, use_container_width=True)
-    with save_button_column:
-        save_clicked = st.button("Save selling prices", key=f"t{tournament_id}_save_prices_button", icon=":material/sell:", disabled=not can_act, use_container_width=True)
-    # After a buy or a save the whole page reruns, so cash, stock and the other parts are current.
-    if buy_clicked:
-        try:
-            bought = logic.buy_tournament_stock_many(DB_PATH, player, tournament_id, {product: int(value) for product, value in quantities.items()})
-            flash(f"t{tournament_id}_buy", f"Stock purchased for €{bought['cost']:.2f}.", kind="toast")
-            st.session_state[f"t{tournament_id}_buy_round"] = buy_round + 1
-            st.rerun()
-        except (ValueError, db.DatabaseUnavailable) as error:
-            notice("error", friendly_error(error))
-    if save_clicked:
-        if not changed:
-            notice("info", "No price changed.")
-        else:
-            try:
-                logic.set_tournament_prices(DB_PATH, player, tournament_id, changed)
-                flash(f"t{tournament_id}_price", "Prices updated.", kind="toast")
-                st.rerun()
-            except (ValueError, db.DatabaseUnavailable) as error:
-                notice("error", friendly_error(error))
 
 
+# Tournament button actions: callbacks, so the card is drawn once with the new state (specs/fix-ghost-elements.md).
+def tournament_buy(tournament_id, player):
+    buy_round = st.session_state.get(f"t{tournament_id}_buy_round", 0)
+    order = {name: int(st.session_state.get(f"t{tournament_id}_buy_{name}_{buy_round}", 0) or 0) for name in logic.PRODUCTS}
+    try:
+        bought = logic.buy_tournament_stock_many(DB_PATH, player, tournament_id, order)
+        flash(f"t{tournament_id}_buy", f"Stock purchased for €{bought['cost']:.2f}.", kind="toast")
+        st.session_state[f"t{tournament_id}_buy_round"] = buy_round + 1
+    except (ValueError, db.DatabaseUnavailable) as error:
+        flash(f"t{tournament_id}_buy", friendly_error(error), kind="toast_error")
 
-# Each tournament card is a fragment: its buttons rerun only this card.
+
+def tournament_save_prices(tournament_id, player, saved):
+    typed = {name: st.session_state.get(f"t{tournament_id}_price_{name}", saved[name]) for name in logic.PRODUCTS}
+    changed = {name: round(float(value), 2) for name, value in typed.items() if round(float(value), 2) != saved[name]}
+    if not changed:
+        flash(f"t{tournament_id}_price", "No price changed.", kind="toast")
+        return
+    try:
+        logic.set_tournament_prices(DB_PATH, player, tournament_id, changed)
+        flash(f"t{tournament_id}_price", "Prices updated.", kind="toast")
+    except (ValueError, db.DatabaseUnavailable) as error:
+        flash(f"t{tournament_id}_price", friendly_error(error), kind="toast_error")
+
+
+# Each tournament card is a fragment: its buttons (callbacks) rerun only this card.
 @st.fragment
 def tournament_card(tournament_id, player):
+    # Button actions of this card: callbacks run before the card is drawn again (specs/fix-ghost-elements.md).
+    def tournament_join(tournament_id, player, code):
+        try:
+            joined = logic.join_tournament(DB_PATH, player, code)
+            flash(f"t{tournament_id}_join", f"You joined {joined['name']} in seat {joined['seat']}.")
+        except (ValueError, db.DatabaseUnavailable) as error:
+            flash(f"t{tournament_id}_join", friendly_error(error), kind="error")
+
+    def tournament_upgrade(tournament_id, player, machine):
+        try:
+            logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, machine)
+            flash(f"t{tournament_id}_upgrade", "Upgrade purchased.")
+        except (ValueError, db.DatabaseUnavailable) as error:
+            flash(f"t{tournament_id}_upgrade", friendly_error(error), kind="error")
+
+    def tournament_ready(tournament_id, player):
+        try:
+            result = logic.ready_tournament(DB_PATH, player, tournament_id)
+            if result["closed_day"]:
+                flash(f"t{tournament_id}_ready", result["closed_day"], kind="closed_day")
+            else:
+                flash(f"t{tournament_id}_ready", "You are Ready.")
+        except (ValueError, db.DatabaseUnavailable) as error:
+            flash(f"t{tournament_id}_ready", friendly_error(error), kind="error")
+
+    def tournament_close(tournament_id, player):
+        try:
+            closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
+            flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
+        except (ValueError, db.DatabaseUnavailable) as error:
+            flash(f"t{tournament_id}_close", friendly_error(error), kind="error")
+
     try:
         # Simulated weather per tournament day (specs/feature-tournament-clarity.md).
         screen = logic.tournament_screen(DB_PATH, player, tournament_id)
@@ -957,8 +1010,8 @@ def tournament_card(tournament_id, player):
             st.markdown(f'<div style="text-align:right"><span class="code-badge">{html.escape(str(screen["code"]))}</span></div>', unsafe_allow_html=True)
         with header_refresh:
             # The brief asks for a Refresh button instead of live updates: it reloads only this card.
-            if st.button("Refresh", key=f"t{tournament_id}_refresh_button", icon=":material/refresh:", use_container_width=True):
-                st.rerun()
+            # A click reruns this card with fresh data from the database.
+            st.button("Refresh", key=f"t{tournament_id}_refresh_button", icon=":material/refresh:", use_container_width=True)
 
         weather_tints = {
             "rain": ("rgba(96,165,250,0.30)", "rgba(30,64,175,0.15)"),
@@ -995,13 +1048,9 @@ def tournament_card(tournament_id, player):
                 f'<b>{html.escape(screen["code"])}</b> with the players, or join it yourself to play.</div>',
                 unsafe_allow_html=True,
             )
-            if playing and st.button("Join this tournament", key=f"t{tournament_id}_join_button", icon=":material/login:", type="primary"):
-                try:
-                    joined = logic.join_tournament(DB_PATH, player, screen["code"])
-                    flash(f"t{tournament_id}_join", f"You joined {joined['name']} in seat {joined['seat']}.")
-                    st.rerun()
-                except (ValueError, db.DatabaseUnavailable) as error:
-                    notice("error", friendly_error(error))
+            if playing:
+                st.button("Join this tournament", key=f"t{tournament_id}_join_button", icon=":material/login:", type="primary",
+                          on_click=tournament_join, args=(tournament_id, player, screen["code"]))
         elif playing:
             if screen["days"]:
                 # Results first: what happened on the last closed day.
@@ -1031,13 +1080,9 @@ def tournament_card(tournament_id, player):
                             f"One time: your Café reference becomes €{details['reference_price']:.2f} for the rest of the "
                             f"tournament (customers pay up to €{details['reference_price']:.2f} / €{2 * details['reference_price']:.2f}).",
                         )
-                        if machine not in owned and can_act and st.button(f"Buy {machine}", key=f"t{tournament_id}_upgrade_button", icon=":material/upgrade:", use_container_width=True):
-                            try:
-                                logic.buy_tournament_upgrade(DB_PATH, player, tournament_id, machine)
-                                flash(f"t{tournament_id}_upgrade", "Upgrade purchased.")
-                                st.rerun()
-                            except (ValueError, db.DatabaseUnavailable) as error:
-                                notice("error", friendly_error(error))
+                        if machine not in owned and can_act:
+                            st.button(f"Buy {machine}", key=f"t{tournament_id}_upgrade_button", icon=":material/upgrade:", use_container_width=True,
+                                      on_click=tournament_upgrade, args=(tournament_id, player, machine))
 
             # 2. Plan the day. Its fields are a small fragment, so the total cost shows while typing.
             with st.container(border=True, key=f"tournament_part_plan_{tournament_id}"):
@@ -1049,6 +1094,15 @@ def tournament_card(tournament_id, player):
                     unsafe_allow_html=True,
                 )
                 tournament_plan(tournament_id, player, own, references, can_act)
+                # The buttons belong to the card (not the small plan fragment): after them the whole card
+                # is drawn again, so cash, stock and part 3 are current.
+                buy_button_column, _, save_button_column = st.columns(PLAN_SIDES)
+                with buy_button_column:
+                    st.button("Buy stock", key=f"t{tournament_id}_buy_button", icon=":material/shopping_cart:", disabled=not can_act,
+                              use_container_width=True, on_click=tournament_buy, args=(tournament_id, player))
+                with save_button_column:
+                    st.button("Save selling prices", key=f"t{tournament_id}_save_prices_button", icon=":material/sell:", disabled=not can_act,
+                              use_container_width=True, on_click=tournament_save_prices, args=(tournament_id, player, dict(own["price"])))
             # 3. Ready and Close day now are one small form: pressing one never sends the other.
             with st.form(f"t{tournament_id}_trade_form", border=False, enter_to_submit=False):
                 with st.container(border=True, key=f"tournament_part_trade_{tournament_id}"):
@@ -1057,44 +1111,23 @@ def tournament_card(tournament_id, player):
                     if can_act:
                         for warning in logic.trade_warnings(own["stock"], own["price"], references):
                             notice("warning", warning)
-                        ready_submitted = st.form_submit_button("Ready", key=f"t{tournament_id}_ready_button", icon=":material/check:", type="primary", use_container_width=True)
-                    else:
-                        ready_submitted = False
-                    if ready_submitted:
-                        try:
-                            result = logic.ready_tournament(DB_PATH, player, tournament_id)
-                            if result["closed_day"]:
-                                flash(f"t{tournament_id}_ready", result["closed_day"], kind="closed_day")
-                            else:
-                                flash(f"t{tournament_id}_ready", "You are Ready.")
-                            st.rerun()
-                        except (ValueError, db.DatabaseUnavailable) as error:
-                            notice("error", friendly_error(error))
+                        st.form_submit_button("Ready", key=f"t{tournament_id}_ready_button", icon=":material/check:", type="primary",
+                                              use_container_width=True, on_click=tournament_ready, args=(tournament_id, player))
                     elif is_ready and playing:
                         notice("info", "You are Ready. Waiting for the other players.")
                     show_players(screen)
                     if player == screen["organiser"] and playing:
-                        close_submitted = st.form_submit_button("Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:", use_container_width=True)
-                        if close_submitted:
-                            try:
-                                closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
-                                flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
-                                st.rerun()
-                            except (ValueError, db.DatabaseUnavailable) as error:
-                                notice("error", friendly_error(error))
+                        st.form_submit_button("Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:",
+                                              use_container_width=True, on_click=tournament_close, args=(tournament_id, player))
         if own is None:
             # 3. The organiser who does not play: who is ready, and Close day now.
             with st.container(border=True, key=f"tournament_part_trade_{tournament_id}"):
                 part_heading(3, f"Day {screen['day']}" if playing else "Tournament complete")
                 st.markdown('<div class="part-caption">The day closes when every player is Ready, or when you close it now.</div>', unsafe_allow_html=True)
                 show_players(screen)
-                if playing and st.button("Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:", use_container_width=True):
-                    try:
-                        closed_day = logic.close_tournament_day(DB_PATH, player, tournament_id)
-                        flash(f"t{tournament_id}_close", closed_day, kind="closed_day")
-                        st.rerun()
-                    except (ValueError, db.DatabaseUnavailable) as error:
-                        notice("error", friendly_error(error))
+                if playing:
+                    st.button("Close day now", key=f"t{tournament_id}_close_button", icon=":material/lock_clock:",
+                              use_container_width=True, on_click=tournament_close, args=(tournament_id, player))
 
         # 4. Results: at the end of the tournament (ranking first), or for the organiser who does not play.
         if not playing or own is None:
